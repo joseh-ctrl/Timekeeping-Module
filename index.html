@@ -321,6 +321,13 @@ tr:last-child td{border-bottom:none}
 .dash-meta b{color:var(--navy);font-weight:600;margin-right:4px}
 .ackbtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px;background:#eef1f7;color:var(--muted)}
 .ackbtn:hover{background:var(--ok);color:#fff}
+.tor{display:flex;justify-content:space-between;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.tor:first-of-type{border-top:none}
+.tor-emp{font-weight:600}
+.tor-meta{font-size:13px;color:var(--muted);margin:5px 0;display:flex;align-items:center;gap:8px}
+.tor-days{font-size:12.5px;color:var(--ink)} .tor-days .h{color:var(--muted)}
+.tor-note{font-size:12.5px;color:var(--muted);font-style:italic;margin-top:4px}
+.tor-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
 
 .hours-detail{min-width:0}
 .detail-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
@@ -424,6 +431,7 @@ const DB = {
   recurring:[],        // template: {id, emp, weekday(0-6), start, end, jobCode}
   excused:{},          // HR flag overrides: `${emp}|${ymd}|${flag}` -> {by, at}
   leave:[],            // {id, emp, date, type(PTO/Sick/Holiday), hours, note}
+  ptoRequests:[],      // from web clock: {id, emp, days:[{ymd,hours}], type, note, status, by, at}
   occurrences:[],      // manual attendance occurrences: {id, emp, date, code, note, by, at}
   occExcused:{},       // excused auto occurrences: `${emp}|${ymd}|${code}` -> {by, at}
   payrollBatches:[],   // {id, start, stop, at, by, status, rows:[...]}
@@ -890,6 +898,7 @@ const SCREENS = [
   {id:'hours',     label:'Hours',         icon:'ti-clock-hour-4', badge:'req', roles:['hr','manager']},
   {id:'schedules', label:'Schedules',     icon:'ti-calendar-event', roles:['hr','manager']},
   {id:'notify',    label:'Notifications', icon:'ti-bell', badge:'alert', roles:['hr','manager']},
+  {id:'timeoff',   label:'Time Off',      icon:'ti-calendar-heart', badge:'timeoff', roles:['hr','manager']},
   {id:'employee',  label:'Employee',      icon:'ti-user', roles:['hr']},
   {id:'reports',   label:'Reports',       icon:'ti-file-text', roles:['hr','manager']},
   {id:'config',    label:'Configuration', icon:'ti-settings', roles:['hr']}
@@ -903,10 +912,10 @@ function signInAs(id){ CURRENT=id; const u=me();
 }
 
 function renderNav(){
-  const u=me(); const reqN = pendingReqCountFor(u); const alertN = alertsFor(u).length;
+  const u=me(); const reqN = pendingReqCountFor(u); const alertN = alertsFor(u).length; const ptoN = ptoPendingCount();
   document.getElementById('nav').innerHTML =
     SCREENS.filter(s=>s.roles.includes(u.role)).map(s=>{
-      const n = s.badge==='req'?reqN : s.badge==='alert'?alertN : 0;
+      const n = s.badge==='req'?reqN : s.badge==='alert'?alertN : s.badge==='timeoff'?ptoN : 0;
       const badge = n ? `<span class="navbadge">${n}</span>` : '';
       return `<button class="navitem ${SCREEN===s.id?'active':''}" onclick="nav('${s.id}')"><i class="ti ${s.icon}"></i>${s.label}${badge}</button>`;
     }).join('');
@@ -948,6 +957,7 @@ function render(){
     schedules:viewSchedules,
     reports:viewReports,
     notify:viewNotifications,
+    timeoff:viewTimeOff,
     config:viewConfig
   })[SCREEN];
   document.getElementById('main').innerHTML = view();
@@ -1594,6 +1604,38 @@ function leavePeriod(empId,start,stop){
   const t={PTO:0,Sick:0,Holiday:0,Bereavement:0};
   DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
   return t;
+}
+
+/* ---------- TIME-OFF APPROVAL QUEUE (requests from the web clock) ---------- */
+function ptoScope(){ const u=me(); if(u.role==='hr') return DB.ptoRequests; const ids=new Set(u.manages||[]); return DB.ptoRequests.filter(r=>ids.has(r.emp)); }
+function ptoPendingCount(){ return ptoScope().filter(r=>r.status==='pending').length; }
+function approveTimeOff(id){ const r=DB.ptoRequests.find(x=>x.id===id); if(!r||r.status!=='pending')return;
+  r.days.forEach(d=>DB.leave.push({id:'lv'+Date.now()+Math.random().toString(36).slice(2,5), emp:r.emp, date:d.ymd, type:r.type, hours:d.hours, note:r.note||'Approved time off'}));
+  r.status='approved'; r.decidedBy=me().name; r.decidedAt=new Date().toISOString(); saveStore(); toast('Approved — posted as leave hours'); render(); }
+function denyTimeOff(id){ const r=DB.ptoRequests.find(x=>x.id===id); if(!r||r.status!=='pending')return;
+  r.status='denied'; r.decidedBy=me().name; r.decidedAt=new Date().toISOString(); saveStore(); toast('Request denied'); render(); }
+
+function viewTimeOff(){
+  const scope=ptoScope();
+  const pend=scope.filter(r=>r.status==='pending').sort((a,b)=>a.days[0].ymd.localeCompare(b.days[0].ymd));
+  const done=scope.filter(r=>r.status!=='pending').sort((a,b)=>new Date(b.decidedAt||b.at)-new Date(a.decidedAt||a.at));
+  const card=r=>{ const e=emp(r.emp); const th=r.days.reduce((s,d)=>s+d.hours,0);
+    return `<div class="tor">
+      <div class="tor-main">
+        <div class="tor-emp">${e.name} <span class="src">${e.empId}</span> · ${e.dept}</div>
+        <div class="tor-meta"><span class="pill ${r.type==='Sick'?'warn':r.type==='Unpaid'?'neutral':'ok'}">${r.type}</span> <b>${th}h</b> · ${r.days.length} day${r.days.length>1?'s':''}</div>
+        <div class="tor-days">${r.days.map(d=>`${md(d.ymd)} <span class="h">(${d.hours}h)</span>`).join(' · ')}</div>
+        ${r.note?`<div class="tor-note">“${r.note}”</div>`:''}
+        ${r.status!=='pending'?`<div class="tor-note" style="color:var(--muted)">${r.status==='approved'?'Approved':'Denied'} by ${r.decidedBy}</div>`:''}
+      </div>
+      ${r.status==='pending'
+        ? `<div class="tor-actions"><button class="btn ghost sm" onclick="denyTimeOff('${r.id}')"><i class="ti ti-x"></i> Deny</button><button class="btn primary sm" onclick="approveTimeOff('${r.id}')"><i class="ti ti-check"></i> Approve</button></div>`
+        : `<span class="pill ${r.status==='approved'?'ok':'bad'}" style="align-self:flex-start">${r.status}</span>`}
+    </div>`; };
+  return `<div class="pagehead"><div><h1>Time Off</h1><p>${me().role==='hr'?'All':'Your team\u2019s'} time-off requests from the web clock. Approving posts the days as leave hours into payroll.</p></div></div>
+    <div class="card"><h2 style="margin-bottom:14px"><i class="ti ti-inbox"></i> Pending <span class="src">${pend.length}</span></h2>
+      ${pend.length?pend.map(card).join(''):'<div class="empty">No pending requests.</div>'}</div>
+    ${done.length?`<div class="card"><h2 style="margin-bottom:14px"><i class="ti ti-history"></i> Recently processed</h2>${done.map(card).join('')}</div>`:''}`;
 }
 // company holidays in range -> auto paid hours for everyone (working a holiday is NOT premium)
 function holidaysInRange(start,stop){ return DB.holidays.filter(h=>h.date>=start && h.date<=stop); }
@@ -2388,6 +2430,11 @@ rebuildManages();
   DB.occurrences.push({id:'oc_s3', emp:'e1', date:ymdAdd(t0,-20), code:'CL', note:'Called in late', by:'Luis Ramos', at:now});
   DB.leave.push({id:'lv_s1', emp:'e2', date:ymdAdd(sundayOf(t0),2), type:'PTO', hours:8, note:'Vacation day'});
   DB.leave.push({id:'lv_s2', emp:'e1', date:ymdAdd(sundayOf(t0),4), type:'Sick', hours:4, note:''});
+  // pending time-off requests arriving from the web clock
+  const fut=n=>ymdAdd(t0,n);
+  DB.ptoRequests.push({id:'pto_s1', emp:'e4', days:[{ymd:fut(6),hours:8},{ymd:fut(7),hours:8}], type:'PTO', note:'Long weekend', status:'pending', by:'Adolfo Amaya', at:now});
+  DB.ptoRequests.push({id:'pto_s2', emp:'e3', days:[{ymd:fut(9),hours:4}], type:'Sick', note:'Doctor appointment', status:'pending', by:'Karen Miller', at:now});
+  DB.ptoRequests.push({id:'pto_s3', emp:'e1', days:[{ymd:fut(12),hours:8},{ymd:fut(13),hours:8},{ymd:fut(14),hours:8}], type:'PTO', note:'Family trip', status:'pending', by:'Maria Sanchez', at:now});
   // company holiday within the current pay period + a manual rest-break premium
   DB.holidays.push({id:'hol_s1', date:ymdAdd(sundayOf(t0),0), name:'Company Holiday', hours:8});
   DB.premiums.push({id:'pm_s1', emp:'e1', date:ymdAdd(sundayOf(t0),1), hours:1, reason:'Missed rest break', by:'Jose Hernandez', at:now});

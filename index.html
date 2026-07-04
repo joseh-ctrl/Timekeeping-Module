@@ -1,0 +1,2398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WS Display · Timekeeping</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --navy:#0f1e3d; --navy2:#1b3a6b; --accent:#3b82f6; --accent2:#60a5fa;
+  --bg:#f4f6fb; --card:#ffffff; --line:#e5e9f2; --ink:#0f1e3d; --muted:#6b7896;
+  --ok:#16a34a; --okbg:#dcfce7; --warn:#d97706; --warnbg:#fef3c7; --bad:#dc2626; --badbg:#fee2e2;
+  --grad:linear-gradient(135deg,#0f1e3d 0%,#1b3a6b 55%,#2563eb 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+button{font-family:inherit;cursor:pointer;border:none}
+input,select{font-family:inherit;font-size:14px}
+
+/* Layout */
+.app{display:flex;min-height:100vh}
+.side{width:230px;background:var(--grad);color:#fff;display:flex;flex-direction:column;position:fixed;height:100vh;z-index:20}
+.brand{padding:20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.12)}
+.brand .logo{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:20px}
+.brand b{font-size:15px;letter-spacing:.3px}
+.brand span{display:block;font-size:11px;opacity:.7;font-weight:400}
+.nav{padding:10px;flex:1;overflow-y:auto}
+.navlbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.5;padding:14px 12px 6px}
+.navitem{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:rgba(255,255,255,.82);font-size:13.5px;font-weight:500;width:100%;text-align:left;background:none;transition:.15s}
+.navitem:hover{background:rgba(255,255,255,.09);color:#fff}
+.navitem.active{background:rgba(255,255,255,.16);color:#fff}
+.navitem i{font-size:18px}
+.whoami{padding:12px;border-top:1px solid rgba(255,255,255,.12)}
+.whoami label{font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.6}
+.whoami select{width:100%;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff}
+.whoami select option{color:#111}
+
+.main{margin-left:230px;flex:1;padding:26px 30px;max-width:100%}
+.pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px}
+.pagehead h1{font-size:22px;font-weight:700}
+.pagehead p{color:var(--muted);font-size:13px;margin-top:3px}
+
+/* Cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+.card h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h2 i{color:var(--accent);font-size:19px}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:600}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)}
+.pill.bad{background:var(--badbg);color:var(--bad)} .pill.neutral{background:#eef1f7;color:var(--muted)}
+
+/* Buttons */
+.btn{padding:9px 15px;border-radius:9px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.btn.primary{background:var(--grad);color:#fff} .btn.primary:hover{opacity:.92}
+.btn.ghost{background:#eef1f7;color:var(--navy)} .btn.ghost:hover{background:#e2e7f2}
+.btn.sm{padding:6px 11px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Clock */
+.clockwrap{display:grid;grid-template-columns:1fr 340px;gap:18px}
+@media(max-width:900px){.clockwrap{grid-template-columns:1fr}}
+.clockface{background:var(--grad);color:#fff;border-radius:16px;padding:28px;text-align:center}
+.clockface .time{font-size:46px;font-weight:700;letter-spacing:1px;font-variant-numeric:tabular-nums}
+.clockface .date{opacity:.8;margin-top:2px;font-size:13px}
+.clockface .status{margin-top:16px;display:inline-flex;align-items:center;gap:7px;padding:6px 14px;border-radius:20px;background:rgba(255,255,255,.15);font-size:13px;font-weight:600}
+.punchgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.punchbtn{padding:16px;border-radius:12px;font-weight:600;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:7px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.18)}
+.punchbtn i{font-size:26px}
+.punchbtn:hover:not(:disabled){background:rgba(255,255,255,.22)}
+.punchbtn:disabled{opacity:.35;cursor:not-allowed}
+.punchbtn.go{background:#16a34a;border-color:#16a34a} .punchbtn.stop{background:#dc2626;border-color:#dc2626}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--line);font-weight:600}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+.punchlog{font-size:12.5px}
+.punchlog td{padding:7px 10px}
+.src{font-size:10px;padding:1px 6px;border-radius:5px;background:#eef1f7;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.src.bio{background:#eef2ff;color:#4338ca}
+
+/* Approval bar */
+.approvals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
+@media(max-width:700px){.approvals{grid-template-columns:1fr}}
+.appbox{border:1.5px solid var(--line);border-radius:12px;padding:14px}
+.appbox.done{border-color:var(--ok);background:var(--okbg)}
+.appbox.locked{opacity:.55}
+.appbox .role{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600}
+.appbox .chk{display:flex;align-items:center;gap:9px;margin-top:9px}
+.appbox .chk input{width:19px;height:19px;accent-color:var(--ok)}
+.appbox .chk label{font-weight:600;font-size:13.5px}
+.appbox .stamp{font-size:11.5px;color:var(--muted);margin-top:7px}
+
+/* Forms */
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.formgrid{grid-template-columns:1fr}}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.field input,.field select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent)}
+
+.roster td .who{font-weight:600}
+.roster td .sub{font-size:11.5px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11px;padding:2px 8px;border-radius:6px;background:#eef1f7;color:var(--navy);font-weight:500}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.empty{text-align:center;padding:40px;color:var(--muted)}
+.exc{font-size:11px;color:var(--bad);display:block}
+.toast{position:fixed;bottom:22px;right:22px;background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transform:translateY(10px);transition:.25s;z-index:50}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* Modal */
+.modal{position:fixed;inset:0;background:rgba(15,30,61,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal.show{display:flex}
+.modalcard{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.modalhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start}
+.modalhead b{font-size:15px}
+.modalbody{padding:18px 20px;overflow-y:auto}
+.modalbody input[type=date],.modalbody input[type=time],.modalbody select{padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fbfcfe;width:100%}
+.modalfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+.notewarn{margin-top:14px;padding:11px 13px;background:var(--warnbg);color:#92600a;border-radius:9px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.notewarn i{font-size:16px;margin-top:1px}
+
+/* History */
+.histpanel{background:#fbfcfe;border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.histhead{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.histrow{display:flex;gap:11px;padding:7px 0;border-top:1px solid var(--line)}
+.histrow:first-of-type{border-top:none}
+.histrow i{font-size:16px;color:var(--accent);margin-top:2px}
+.histmain{font-size:13px;font-weight:500}
+.histmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* Nav badge */
+.navbadge{margin-left:auto;background:#f43f5e;color:#fff;font-size:11px;font-weight:700;min-width:19px;height:19px;border-radius:10px;display:inline-grid;place-items:center;padding:0 5px}
+.navitem{position:relative}
+
+/* Dashboard hero */
+.hero{background:var(--grad);border-radius:16px;padding:26px 28px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;overflow:hidden;position:relative}
+.hero-eyebrow{font-size:11px;letter-spacing:1.4px;opacity:.7;font-weight:600;margin-bottom:6px}
+.hero-txt h2{font-size:26px;font-weight:700;margin-bottom:4px}
+.hero-txt p{opacity:.82;font-size:14px}
+.hero-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.hero-cta{background:#fff;color:var(--navy)}
+.hero-cta:hover{opacity:.92}
+.hero-cta.ghost{background:rgba(255,255,255,.14);color:#fff}
+.hero-badge{font-size:80px;opacity:.13;position:absolute;right:26px;top:50%;transform:translateY(-50%)}
+
+/* KPI cards */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+@media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi-ic{width:34px;height:34px;border-radius:9px;background:#eef2ff;color:var(--accent);display:grid;place-items:center;font-size:19px;margin-bottom:10px}
+.kpi.ok .kpi-ic{background:var(--okbg);color:var(--ok)} .kpi.warn .kpi-ic{background:var(--warnbg);color:var(--warn)}
+.kpi.bad .kpi-ic{background:var(--badbg);color:var(--bad)} .kpi.neutral .kpi-ic{background:#eef1f7;color:var(--muted)}
+.kpi-val{font-size:24px;font-weight:700;line-height:1.1}
+.kpi-lbl{font-size:12.5px;color:var(--muted);margin-top:2px;font-weight:500}
+.kpi-sub{font-size:11.5px;color:var(--muted);margin-top:5px}
+
+/* Dashboard grid + lists */
+.dashgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:820px){.dashgrid{grid-template-columns:1fr}}
+.cbadge{background:#f43f5e;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;margin-left:6px}
+.listrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.listrow:first-of-type{border-top:none}
+.card h2+.listrow{border-top:none}
+.listrow[onclick]{cursor:pointer} .listrow[onclick]:hover{background:#fafbff;margin:0 -8px;padding-left:8px;padding-right:8px;border-radius:8px}
+.listrow b{font-size:13.5px} .listsub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.listrow .ti-chevron-right{color:var(--muted)}
+
+/* Correction request banner (on timecards) */
+.reqbanner{border-radius:11px;padding:6px 14px;margin-bottom:12px}
+.reqbanner.act{background:#fff7ed;border:1px solid #fed7aa}
+.reqbanner.info{background:#eef2ff;border:1px solid #c7d2fe}
+.reqrow{display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px solid rgba(0,0,0,.06)}
+.reqrow:first-child{border-top:none}
+.reqrow>i{font-size:19px;color:var(--warn)}
+.reqbanner.info .reqrow>i{color:var(--accent)}
+.reqrow>div:nth-child(2){flex:1}
+.reqrow b{font-size:13px} .reqmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+/* Widget board (Namely-style) */
+.wboard{columns:3;column-gap:18px}
+@media(max-width:1050px){.wboard{columns:2}}
+@media(max-width:720px){.wboard{columns:1}}
+.widget{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0;margin:0 0 18px;break-inside:avoid;display:inline-block;width:100%;overflow:hidden}
+.whead{display:flex;justify-content:space-between;align-items:center;padding:15px 16px 12px;border-bottom:1px solid var(--line)}
+.wtitle{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600}
+.wic{width:28px;height:28px;border-radius:8px;background:#eef2ff;color:var(--accent);display:grid;place-items:center;font-size:17px}
+.wcount{font-size:22px;font-weight:700;color:var(--navy)}
+.wcount.warn{color:var(--warn)} .wcount.bad{color:var(--bad)} .wcount.ok{color:var(--ok)}
+.wbody{padding:6px 16px;max-height:280px;overflow-y:auto}
+.wfoot{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+.wtable{font-size:12.5px}
+.wtable th{position:sticky;top:0;background:#fff;padding:7px 8px}
+.wtable td{padding:7px 8px}
+.wrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.wrow:first-child{border-top:none}
+.wrow b{font-size:13px}
+.wactions{display:flex;gap:6px;flex-shrink:0}
+.iconbtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px;background:#eef1f7;color:var(--muted)}
+.iconbtn.ok{background:var(--okbg);color:var(--ok)} .iconbtn.ok:hover{background:#bbf7d0}
+.iconbtn.bad{background:var(--badbg);color:var(--bad)} .iconbtn.bad:hover{background:#fecaca}
+
+/* Donut + stacked bar */
+.donutwrap{display:flex;align-items:center;gap:16px;padding:8px 0}
+.donut{width:120px;height:120px;border-radius:50%;flex-shrink:0;position:relative}
+.donuthole{position:absolute;inset:24px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.donuthole b{font-size:18px} .donuthole span{font-size:10px;color:var(--muted)}
+.donutleg{font-size:12.5px;display:flex;flex-direction:column;gap:6px}
+.legrow{display:flex;align-items:center;gap:7px}
+.legdot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+.stack{height:26px;border-radius:7px;overflow:hidden;display:flex;margin:6px 0 10px}
+.stack .seg.ok{background:var(--ok)} .stack .seg.warn{background:#eab308}
+.stackleg{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.stackleg span{display:flex;align-items:center;gap:6px}
+
+/* Top bar */
+.topbar{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 16px;margin-bottom:18px}
+.tb-meta{display:flex;gap:20px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.tb-meta b{color:var(--navy);font-weight:600;margin-right:4px}
+.tb-actions{display:flex;align-items:center;gap:10px}
+.tb-chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;color:var(--navy);font-weight:600;font-size:12.5px;padding:6px 11px;border-radius:20px}
+.tb-chip i{font-size:16px}
+
+/* Sidebar user chip */
+.usr{display:flex;align-items:center;gap:10px;color:#fff}
+.usr i{font-size:30px;opacity:.85}
+.usr b{font-size:13px;display:block} .usr span{font-size:11px;opacity:.65}
+
+/* Employee ID + placeholder */
+.empid{font-variant-numeric:tabular-nums;font-weight:600;color:var(--muted)}
+.ph{text-align:center;padding:38px 20px}
+.ph>i{font-size:44px;color:var(--accent);opacity:.5}
+.ph h3{font-size:16px;margin:12px 0 4px}
+.ph p{color:var(--muted);font-size:13px}
+.ph-list{list-style:none;margin:16px auto 0;max-width:340px;text-align:left}
+.ph-list li{padding:7px 0 7px 24px;position:relative;font-size:13px;border-top:1px solid var(--line)}
+.ph-list li:before{content:'○';position:absolute;left:6px;color:var(--accent)}
+
+/* Hours master-detail */
+.hours-layout{display:grid;grid-template-columns:270px 1fr;gap:18px;align-items:start}
+.hours-layout.collapsed{grid-template-columns:1fr}
+@media(max-width:900px){.hours-layout{grid-template-columns:1fr}}
+.emplist{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:sticky;top:20px}
+.emplist-head{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+.sortrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.sortrow>span{white-space:nowrap;font-weight:600}
+.sortrow select{flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;font-size:13px}
+.emp-search{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+.emplist-count{font-size:11px;color:var(--muted)}
+.emplist-body{max-height:620px;overflow-y:auto}
+.emp-group{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);background:#f4f6fb;padding:7px 12px;position:sticky;top:0}
+.emp-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;background:none;border-bottom:1px solid var(--line);color:var(--ink)}
+.emp-item:hover{background:#fafbff}
+.emp-item.on{background:#eef2ff;box-shadow:inset 3px 0 0 var(--accent)}
+.emp-item i{font-size:26px;color:var(--muted);flex-shrink:0}
+.emp-item b{font-size:13px;display:block} .emp-item span{font-size:11px;color:var(--muted)}
+.emp-item .ei-main{flex:1;min-width:0}
+.ei-hrs{font-variant-numeric:tabular-nums;font-weight:700;font-size:13px;color:var(--navy);flex-shrink:0}
+.excuse-btn{font-size:10px;font-weight:600;padding:1px 7px;border-radius:6px;background:#eef1f7;color:var(--muted);margin-left:4px}
+.excuse-btn:hover{background:var(--navy);color:#fff}
+.exc.excused{color:var(--muted);text-decoration:line-through;text-decoration-color:rgba(0,0,0,.3)}
+.exc.excused em{color:var(--ok);font-style:normal;text-decoration:none}
+.occ-excused td{color:var(--muted)}
+.paytable{font-size:12.5px} .paytable th,.paytable td{padding:7px 9px}
+.paytable tfoot td{border-top:2px solid var(--line);background:#fbfcfe}
+.cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:820px){.cfg-grid{grid-template-columns:1fr}}
+
+/* Reports */
+.rpt-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.rpt-bar .field{min-width:130px}
+.rpt-bar select,.rpt-bar input[type=date]{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;width:100%}
+.rpt-presets{margin-top:14px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rpt-cols{margin-top:12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.colchip{font-size:12px;padding:4px 10px;border-radius:16px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+.colchip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.rpt-actions{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.rpt-saved{margin-top:10px;font-size:12px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.savedchip{display:inline-flex;align-items:center;background:#eef2ff;border-radius:16px;overflow:hidden}
+.savedchip button{background:none;padding:4px 6px 4px 11px;font-size:12px;font-weight:600;color:var(--navy)}
+.savedchip .x{padding:4px 9px 4px 3px;color:var(--muted)}
+.rpt{width:100%;border-collapse:collapse;font-size:12.5px}
+.rpt th,.rpt td{padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.rpt tr.grp td{background:#eef2ff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--navy)}
+.rpt tr.sub td{background:#fbfcfe;font-weight:600;border-bottom:2px solid var(--line)}
+.rpt tfoot td{background:var(--navy);color:#fff;font-weight:700}
+
+/* Toggle switch */
+.toggle{width:38px;height:22px;border-radius:12px;background:#cbd5e1;position:relative;transition:.15s;padding:0}
+.toggle.on{background:var(--ok)}
+.toggle span{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.toggle.on span{left:18px}
+
+/* Segment timecard (Namely-style) */
+.tcard{width:100%;border-collapse:collapse;font-size:12.5px;min-width:820px}
+.tcard th{padding:8px 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:2px solid var(--line);text-align:left;white-space:nowrap}
+.tcard td{padding:7px 8px;border-bottom:1px solid #eef1f7;white-space:nowrap}
+.tcard tr.tc-day td{border-top:1px solid var(--line)}
+.tcard .apcol{text-align:center;width:34px}
+.tcard th.apcol{font-size:13px;font-weight:700;color:var(--navy)}
+.tcard th.apcol.clickable{cursor:pointer;border-radius:6px}
+.tcard th.apcol.clickable:hover{background:#eef2ff}
+.tcard input[type=checkbox]{width:16px;height:16px;accent-color:var(--ok);cursor:pointer}
+.tcard .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad)}
+.tcard .brk{color:var(--muted);font-variant-numeric:tabular-nums}
+.tcard .tin b{color:var(--navy)}
+.tcard .editcell{cursor:pointer}
+.tcard .editcell:hover{background:#eef2ff;box-shadow:inset 0 0 0 1px var(--accent)}
+.notebtn{background:none;color:#cbd5e1;font-size:16px;padding:2px}
+.notebtn.has{color:var(--accent)}
+.notebtn:hover{color:var(--navy)}
+.tc-flags{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+
+/* Dashboard meta strip (under hero) */
+.dash-meta{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.dash-meta b{color:var(--navy);font-weight:600;margin-right:4px}
+.ackbtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px;background:#eef1f7;color:var(--muted)}
+.ackbtn:hover{background:var(--ok);color:#fff}
+
+.hours-detail{min-width:0}
+.detail-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.detail-nav{display:flex;flex-direction:column;gap:3px}
+.detail-nav .iconbtn{width:28px;height:22px;background:#eef1f7}
+.detail-who b{font-size:18px} .detail-who span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.periodbar{display:flex;align-items:flex-end;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap}
+.periodbar .field{min-width:120px}
+.periodbar input[type=date],.periodbar select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;width:100%}
+.totalsbar{display:flex;gap:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.tcell{padding:8px 16px;text-align:center;border-right:1px solid var(--line);background:#fbfcfe}
+.tcell:last-child{border-right:none}
+.tcell span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.tcell b{font-size:17px;font-variant-numeric:tabular-nums}
+.tcell.total{background:var(--navy);color:#fff} .tcell.total span{color:rgba(255,255,255,.7)}
+
+/* Sub-tabs (Overrides / Recurring) */
+.subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.subtab{background:none;padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.subtab.on{color:var(--navy);border-bottom-color:var(--accent)}
+.wk-toggle{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.wk-toggle input{width:16px;height:16px;accent-color:var(--accent)}
+
+/* Schedule week grid */
+.week-label{font-size:14px;font-weight:700;color:var(--navy);margin:14px 0 8px}
+.sched-note{font-size:12px;color:var(--muted);margin-bottom:10px}
+.week-grid{display:grid;gap:8px;margin-bottom:6px}
+.day-cell{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);min-height:96px;display:flex;flex-direction:column}
+.day-head{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:#f4f6fb;font-size:11.5px;color:var(--muted)}
+.day-head b{color:var(--navy);font-variant-numeric:tabular-nums}
+.day-body{padding:8px;display:flex;flex-direction:column;gap:6px;flex:1}
+.seg-chip{text-align:left;background:#eef2ff;border:1px solid #dbe4ff;border-radius:8px;padding:6px 8px;color:var(--navy)}
+.seg-chip:hover{background:#e0e9ff}
+.seg-chip b{display:block;font-size:12px} .seg-chip span{font-size:10.5px;color:var(--muted)}
+.add-seg{margin-top:auto;background:none;border:1px dashed var(--line);border-radius:8px;padding:6px;font-size:12px;font-weight:600;color:var(--accent);display:flex;align-items:center;justify-content:center;gap:5px}
+.add-seg:hover{background:#f4f8ff;border-color:var(--accent)}
+@media(max-width:1100px){.week-grid{grid-template-columns:repeat(2,1fr)!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo"><i class="ti ti-clock-hour-4"></i></div>
+      <div><b>Timekeeping</b><span>WS Display · HR</span></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="whoami">
+      <label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:.6">Signed in as</label>
+      <select id="signIn" onchange="signInAs(this.value)"></select>
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"></div>
+
+<script>
+/* ============================================================
+   DATA LAYER  — in-memory for preview.
+   Swap loadStore()/saveStore() bodies for Supabase later:
+   table `tk_employees`, `tk_punches`, `tk_timecards`.
+============================================================ */
+const TZ = {
+  'America/Los_Angeles':'Pacific (CA)',
+  'America/New_York':'Eastern (PA)'
+};
+const OT_RULES = {
+  CA:{label:'California (daily 8/12 + weekly 40)', daily:true, ot:8, dt:12, weekly:40},
+  FED:{label:'Federal / PA (weekly 40 only)', daily:false, weekly:40}
+};
+// Rules derive from the employee's STATE (meal/break law + overtime). Timezone is separate.
+const STATE_RULES = {
+  CA:{label:'California', daily:true, ot:8, dt:12, weekly:40, mealLaw:true},   // meal before end of 5th hour
+  PA:{label:'Pennsylvania', daily:false, weekly:40, mealLaw:false}            // federal: weekly OT only, no state meal mandate
+};
+const STATES = Object.keys(STATE_RULES);
+function ruleFor(e){ return STATE_RULES[e.loc] || STATE_RULES.CA; }
+// HR flag overrides (excused exceptions): key `${emp}|${ymd}|${flag}`
+function excuseKey(emp,ymd,flag){ return `${emp}|${ymd}|${flag}`; }
+function isExcused(emp,ymd,flag){ return !!(DB.excused && DB.excused[excuseKey(emp,ymd,flag)]); }
+
+const DB = {
+  employees:[
+    {id:'e1', name:'Maria Sanchez',   empId:'735', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:22.00, webPunch:true,  fmt:'12h', weekStart:0},
+    {id:'e2', name:'David Cruz',       empId:'781', loc:'CA', dept:'Warehouse',  tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:24.50, webPunch:false,  fmt:'12h', weekStart:0},
+    {id:'e3', name:'Karen Miller',     empId:'651', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:21.00, webPunch:true, fmt:'12h', weekStart:0},
+    {id:'e4', name:'Adolfo Amaya',     empId:'037', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:20.00, webPunch:false,  fmt:'12h', weekStart:0},
+    {id:'e5', name:'Aileen Arguelles', empId:'112', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:21.50, webPunch:true, fmt:'12h', weekStart:0},
+    {id:'e6', name:'Angel Coronel',    empId:'065', loc:'CA', dept:'Warehouse',  tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:23.00, webPunch:false,  fmt:'12h', weekStart:0},
+    {id:'e7', name:'Bertha Flores',    empId:'078', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:20.50, webPunch:true, fmt:'12h', weekStart:0},
+    {id:'m1', name:'Luis Ramos',       empId:'201', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'hr', role:'manager',  otRule:'CA', rate:32.00, webPunch:true,  fmt:'12h', weekStart:0},
+    {id:'m2', name:'Beth Owens',       empId:'202', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'hr', role:'manager',  otRule:'FED', rate:31.00, webPunch:true, fmt:'12h', weekStart:0},
+    {id:'hr', name:'Jose Hernandez',   empId:'100', loc:'CA', dept:'HR',         tz:'America/Los_Angeles', mgr:null, role:'hr',       otRule:'CA', rate:40.00, webPunch:true,  fmt:'12h', weekStart:0}
+  ],
+  punches:[],          // {id, emp, ts(UTC ISO), type, source, editedBy}
+  approvals:{},        // key `${emp}|${weekKey}` -> {employee:{by,at}, manager:{}, hr:{}, locked}
+  audit:[],            // {id, emp, weekKey, action, punchId, before, after, by, at, reason}
+  requests:[],         // {id, emp, weekKey, kind, targetId, proposed:{ymd,time,type}, note, status, by, at, resolvedBy, resolvedAt, resolveNote}
+  schedules:[],        // overrides: {id, emp, date(ymd), start(HH:MM), end, jobCode, note}
+  recurring:[],        // template: {id, emp, weekday(0-6), start, end, jobCode}
+  excused:{},          // HR flag overrides: `${emp}|${ymd}|${flag}` -> {by, at}
+  leave:[],            // {id, emp, date, type(PTO/Sick/Holiday), hours, note}
+  occurrences:[],      // manual attendance occurrences: {id, emp, date, code, note, by, at}
+  occExcused:{},       // excused auto occurrences: `${emp}|${ymd}|${code}` -> {by, at}
+  payrollBatches:[],   // {id, start, stop, at, by, status, rows:[...]}
+  holidays:[],         // company holidays: {id, date, name, hours}
+  premiums:[],         // manual premium hours: {id, emp, date, hours, reason, by, at}
+  reportConfigs:[],    // saved custom reports
+  segApprovals:{},     // per-segment E/M/O approval
+  segNotes:{},         // per-segment notes
+  ackAlerts:{}         // acknowledged notifications: alertKey -> {by, at}
+};
+const LEAVE_TYPES=['PTO','Sick','Holiday','Bereavement'];
+// Attendance point system (WS Display policy, rev. 2026)
+const OCC_TYPES={
+  CIE: {label:'Clock In Early (unapproved)', points:0.5,  auto:true},
+  LE:  {label:'Leaving Early (unapproved)',  points:0.5,  auto:true},
+  UA:  {label:'Unapproved Absence',          points:1,    auto:true},
+  CL:  {label:'Called In Late',              points:0.5,  auto:false},
+  L:   {label:'Late',                        points:0.75, auto:true},
+  CLNS:{label:'Called Late / No Show',       points:5,    auto:false},
+  NCNS:{label:'No Call / No Show',           points:5,    auto:false}
+};
+const CFG = {
+  payAnchor:'2025-12-29',   // Monday that starts a pay period (editable in Configuration)
+  lateMin:10,               // 10+ min after scheduled start = Late
+  earlyMin:5,               // >5 min before scheduled start (unapproved) = Clock In Early
+  leaveMin:5,               // >5 min before scheduled end = Leaving Early
+  holidayHours:8,           // default paid hours per company holiday
+  dedupMin:3                // punches of same type within N min are de-duplicated (latest source wins)
+};
+function disciplineTier(pts){
+  if(pts>15) return {label:'Final warning / suspension / termination', tone:'bad'};
+  if(pts>=11) return {label:'Written warning', tone:'bad'};
+  if(pts>=6) return {label:'Verbal warning', tone:'warn'};
+  if(pts>=1) return {label:'Coaching', tone:'warn'};
+  return {label:'Good standing', tone:'ok'};
+}
+const JOBCODES=['CA - REG','PA - REG','Training','Meeting'];
+
+/* ---- seed a week of punches for Maria (e1) to review visually ---- */
+(function seed(){
+  const base = new Date(); base.setHours(0,0,0,0);
+  const day = 86400000;
+  function pk(empId, dayOffset, h, m, type){
+    const d = new Date(base.getTime() - dayOffset*day);
+    d.setHours(h, m, 0, 0);            // treated as local machine tz for the seed
+    return {id:'p'+Math.random().toString(36).slice(2,8), emp:empId, ts:d.toISOString(), type, source:'biometric'};
+  }
+  // Maria (e1): Mon-Wed normal, Thu short meal (premium), Fri missing out punch
+  const e1days = [
+    {o:4, rows:[[8,2,'in'],[12,0,'meal_start'],[12,30,'meal_end'],[16,58,'out']]},           // ~8.5h
+    {o:3, rows:[[7,55,'in'],[11,45,'meal_start'],[12,15,'meal_end'],[17,20,'out']]},          // ~9h -> OT
+    {o:2, rows:[[8,5,'in'],[12,0,'meal_start'],[12,30,'meal_end'],[16,30,'out']]},
+    {o:1, rows:[[8,0,'in'],[12,0,'meal_start'],[12,18,'meal_end'],[16,45,'out']]},            // 18-min meal -> premium
+    {o:0, rows:[[8,10,'in'],[12,0,'meal_start'],[12,35,'meal_end']]}                          // no out -> missing punch
+  ];
+  // David (e2, CA): clean ~8h days, no exceptions
+  const clean = o => ({o, rows:[[8,0,'in'],[12,0,'meal_start'],[12,30,'meal_end'],[16,30,'out']]}); // 8h
+  const e2days = [clean(4),clean(3),clean(2),clean(1),{o:0, rows:[[8,0,'in'],[12,0,'meal_start'],[12,30,'meal_end']]}];
+  // Karen (e3, PA/FED): ~8.8h days -> ~44h week, tips into weekly OT
+  const long = o => ({o, rows:[[7,30,'in'],[12,0,'meal_start'],[12,30,'meal_end'],[16,50,'out']]}); // ~8.8h
+  const e3days = [long(4),long(3),long(2),long(1),{o:0, rows:[[7,30,'in'],[12,0,'meal_start'],[12,30,'meal_end']]}];
+
+  e1days.forEach(d=>d.rows.forEach(r=>DB.punches.push(pk('e1', d.o, r[0], r[1], r[2]))));
+  e2days.forEach(d=>d.rows.forEach(r=>DB.punches.push(pk('e2', d.o, r[0], r[1], r[2]))));
+  e3days.forEach(d=>d.rows.forEach(r=>DB.punches.push(pk('e3', d.o, r[0], r[1], r[2]))));
+})();
+
+function saveStore(){ /* TODO: upsert DB.* into Supabase */ }
+function loadStore(){ /* TODO: fetch from Supabase into DB.* */ }
+
+/* ============================================================
+   SESSION / PERMISSIONS
+============================================================ */
+let CURRENT = 'hr';
+const me = () => DB.employees.find(e=>e.id===CURRENT);
+const emp = id => DB.employees.find(e=>e.id===id);
+function can(action, targetEmp){
+  const u = me();
+  if(u.role==='hr') return true;
+  if(u.role==='manager') return u.manages && u.manages.includes(targetEmp);
+  return u.id===targetEmp; // employee: self only
+}
+
+/* ============================================================
+   TIME HELPERS  (punches stored UTC, shown in employee tz)
+============================================================ */
+function partsInTz(iso, tz){
+  const f = new Intl.DateTimeFormat('en-US',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,weekday:'short'});
+  const p = {}; f.formatToParts(new Date(iso)).forEach(x=>p[x.type]=x.value);
+  return {ymd:`${p.year}-${p.month}-${p.day}`, hh:+p.hour, mm:+p.minute, wd:p.weekday};
+}
+function fmtTime(iso, e){
+  return new Intl.DateTimeFormat('en-US',{timeZone:e.tz,hour:'numeric',minute:'2-digit',hour12:true}).format(new Date(iso));
+}
+// convert a raw "HH:MM" (24h) string to 12-hour display, e.g. "16:45" -> "4:45 PM"
+function fmt12(hm){ if(!hm||!hm.includes(':')) return hm; let [h,m]=hm.split(':').map(Number); const ap=h<12?'AM':'PM'; h=h%12||12; return `${h}:${String(m).padStart(2,'0')} ${ap}`; }
+function weekKeyFor(iso, e){ // Monday-start week id in employee tz
+  const p = partsInTz(iso,e.tz);
+  const local = new Date(p.ymd+'T00:00:00Z');
+  const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(p.wd);
+  const back = (dow+6)%7;                    // days back to Monday
+  const mon = new Date(local.getTime() - back*86400000);
+  return mon.toISOString().slice(0,10);
+}
+function currentWeekKey(e){ return weekKeyFor(new Date().toISOString(), e); }
+function weekLabel(key){
+  const s = new Date(key+'T00:00:00Z'); const e = new Date(s.getTime()+6*86400000);
+  const f = d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
+  return `${f(s)} – ${f(e)}`;
+}
+// Biweekly pay period, Monday–Sunday, anchored to a known period-start Monday.
+function payPeriodStart(ymd){
+  const anchor=CFG.payAnchor;
+  const ms = Date.parse(ymd+'T00:00:00Z') - Date.parse(anchor+'T00:00:00Z');
+  const n = Math.floor(ms/(14*86400000));
+  return new Date(Date.parse(anchor+'T00:00:00Z') + n*14*86400000).toISOString().slice(0,10);
+}
+
+// HH:MM (24h) of a punch in employee tz — for <input type="time">
+function hhmm(iso, e){ const p=partsInTz(iso,e.tz); return `${String(p.hh).padStart(2,'0')}:${String(p.mm).padStart(2,'0')}`; }
+// minutes a tz is ahead of UTC at a given instant
+function offsetMin(date, tz){
+  const dtf=new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const p={}; dtf.formatToParts(date).forEach(x=>p[x.type]=x.value);
+  const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+  return (asUTC-date.getTime())/60000;
+}
+// employee-local wall time (ymd + "HH:MM") -> UTC ISO
+function wallToUtc(ymd, hm, tz){
+  const [Y,M,D]=ymd.split('-').map(Number); const [h,m]=hm.split(':').map(Number);
+  const guess=new Date(Date.UTC(Y,M-1,D,h,m,0));
+  let off=offsetMin(guess,tz);
+  let utc=new Date(guess.getTime()-off*60000);
+  const off2=offsetMin(utc,tz); if(off2!==off) utc=new Date(guess.getTime()-off2*60000); // DST edge
+  return utc.toISOString();
+}
+function audit(action, empId, weekKey, punchId, before, after, by, reason){
+  DB.audit.push({id:'a'+Date.now()+Math.random().toString(36).slice(2,5), action, emp:empId, weekKey, punchId, before, after, by, reason, at:new Date().toISOString()});
+}
+
+/* ============================================================
+   TIMECARD ENGINE — pair punches, totals, OT, exceptions
+============================================================ */
+function dedupPunches(list){
+  // same emp + type within CFG.dedupMin minutes: keep the latest-recorded (latest ts) — "latest source wins"
+  const out=[]; const win=CFG.dedupMin*60000;
+  const sorted=[...list].sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  sorted.forEach(p=>{
+    const dup=out.find(q=>q.type===p.type && Math.abs(new Date(q.ts)-new Date(p.ts))<win);
+    if(dup){ if(new Date(p.ts)>=new Date(dup.ts)){ dup.ts=p.ts; dup.source=p.source; dup.editedBy=p.editedBy; } }
+    else out.push({...p});
+  });
+  return out.sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+}
+function buildTimecard(empId, weekKey){
+  const e = emp(empId); const rule = ruleFor(e);
+  const wp = dedupPunches(DB.punches.filter(p=>p.emp===empId && weekKeyFor(p.ts,e)===weekKey));
+  const byDay = {};
+  wp.forEach(p=>{ const k=partsInTz(p.ts,e.tz).ymd; (byDay[k]=byDay[k]||[]).push(p); });
+
+  const days = Object.keys(byDay).sort().map(ymd=>{
+    const ps = byDay[ymd]; let worked=0, mealMin=0, exceptions=[]; let mealViol=false;
+    let inT=null, mealT=null;
+    ps.forEach(p=>{
+      const t = new Date(p.ts).getTime();
+      if(p.type==='in') inT=t;
+      else if(p.type==='out'){ if(inT){worked+=t-inT; inT=null;} else exceptions.push('Out with no In'); }
+      else if(p.type==='meal_start'){ mealT=t; if(inT){worked+=t-inT; inT=null;} }
+      else if(p.type==='meal_end'){ if(mealT){mealMin+=(t-mealT)/60000; inT=t; mealT=null;} }
+    });
+    if(inT) exceptions.push('Missing out punch');
+    const hrs = worked/3600000;
+    // meal-law flags (state-driven, e.g. CA: 30-min meal before end of 5th hour) -> premium owed
+    if(rule.mealLaw){
+      if(hrs>5 && mealMin===0){ exceptions.push('No meal past 5th hour · premium'); mealViol=true; }
+      else if(mealMin>0 && mealMin<30){ exceptions.push(`Short meal ${Math.round(mealMin)}m · premium`); mealViol=true; }
+    }
+    return {ymd, punches:ps, hrs, mealMin, exceptions, mealViol};
+  });
+
+  // OT allocation
+  let reg=0, ot=0, dt=0;
+  if(rule.daily){
+    const worked = days.filter(d=>d.hrs>0);
+    const seventh = worked.length>=7 ? worked[worked.length-1].ymd : null; // all 7 days worked = 7th consecutive
+    days.forEach(d=>{
+      const h=d.hrs;
+      if(d.ymd===seventh){ if(h>8){ ot+=8; dt+=h-8; } else { ot+=h; } return; } // 7th day: 1.5x first 8, 2x beyond
+      if(h>rule.dt){ dt+=h-rule.dt; ot+=rule.dt-rule.ot; reg+=rule.ot; }
+      else if(h>rule.ot){ ot+=h-rule.ot; reg+=rule.ot; }
+      else reg+=h;
+    });
+    if(reg>rule.weekly){ ot+=reg-rule.weekly; reg=rule.weekly; }
+  } else {
+    const total = days.reduce((s,d)=>s+d.hrs,0);
+    reg = Math.min(total, rule.weekly); ot = Math.max(0, total-rule.weekly);
+  }
+  const total = days.reduce((s,d)=>s+d.hrs,0);
+  const anyExc = days.some(d=>d.exceptions.length);
+  return {e, weekKey, days, reg, ot, dt, total, anyExc};
+}
+
+/* ============================================================
+   APPROVAL STATE
+============================================================ */
+function approvalKey(empId, weekKey){ return `${empId}|${weekKey}`; }
+function getApproval(empId, weekKey){
+  const k = approvalKey(empId, weekKey);
+  if(!DB.approvals[k]) DB.approvals[k] = {employee:null, manager:null, hr:null, locked:false};
+  return DB.approvals[k];
+}
+function setApproval(empId, weekKey, layer, on){
+  const a = getApproval(empId, weekKey);
+  a[layer] = on ? {by:me().name, at:new Date().toISOString()} : null;
+  // cascade: unchecking a lower layer clears the ones above it
+  if(layer==='employee' && !on){ a.manager=null; a.hr=null; }
+  if(layer==='manager' && !on){ a.hr=null; }
+  a.locked = !!(a.employee && a.manager && a.hr);
+  saveStore(); render();
+}
+
+function unlockCard(empId, weekKey){
+  DB.approvals[approvalKey(empId,weekKey)]={employee:null,manager:null,hr:null,locked:false};
+  audit('unlock', empId, weekKey, null, null, null, me().name, 'Timecard unlocked for edit');
+  saveStore(); toast('Timecard unlocked'); render();
+}
+function toggleExcuse(empId, ymd, flagEnc){
+  const flag=decodeURIComponent(flagEnc); const k=excuseKey(empId,ymd,flag);
+  const wk=sundayOf(ymd);
+  if(DB.excused[k]){ delete DB.excused[k]; audit('excuse', empId, wk, null, null, null, me().name, 'Removed flag override: '+flag); }
+  else { DB.excused[k]={by:me().name, at:new Date().toISOString()}; audit('excuse', empId, wk, null, null, null, me().name, 'Flag overridden (excused): '+flag); }
+  saveStore(); render();
+}
+
+/* ============================================================
+   MANUAL EDIT + AUDIT TRAIL
+============================================================ */
+const TYPES=['in','meal_start','meal_end','break_start','break_end','out'];
+let EDIT=null;
+const SHOWHIST=new Set();
+function toggleHist(empId, weekKey){ const k=approvalKey(empId,weekKey); SHOWHIST.has(k)?SHOWHIST.delete(k):SHOWHIST.add(k); render(); }
+
+function openEdit(empId, weekKey){
+  REQ=null;
+  const e=emp(empId);
+  const rows=DB.punches.filter(p=>p.emp===empId && weekKeyFor(p.ts,e)===weekKey)
+    .sort((a,b)=>new Date(a.ts)-new Date(b.ts))
+    .map(p=>({id:p.id, ymd:partsInTz(p.ts,e.tz).ymd, time:hhmm(p.ts,e), type:p.type, source:p.source}));
+  EDIT={empId, weekKey, rows, removed:[], reason:''};
+  renderModal();
+}
+function editRow(i,f,v){ EDIT.rows[i][f]=v; }
+function removeRow(i){ const r=EDIT.rows[i]; if(r.id) EDIT.removed.push(r); EDIT.rows.splice(i,1); renderModal(); }
+function addRow(){ EDIT.rows.push({id:null, ymd:EDIT.weekKey, time:'12:00', type:'in', source:'manual'}); renderModal(); }
+function closeEdit(){ EDIT=null; renderModal(); }
+
+function saveEdit(){
+  const {empId, weekKey, rows, removed, reason}=EDIT; const e=emp(empId);
+  if(!reason.trim()){ toast('Add a reason for the change'); return; }
+  const by=me().name; let changed=false;
+  removed.forEach(r=>{ if(r.id){ DB.punches=DB.punches.filter(p=>p.id!==r.id);
+    audit('delete',empId,weekKey,r.id,{time:r.time,type:r.type},null,by,reason); changed=true; } });
+  rows.forEach(r=>{
+    const iso=wallToUtc(r.ymd,r.time,e.tz);
+    if(!r.id){
+      const np={id:'p'+Date.now()+Math.random().toString(36).slice(2,5), emp:empId, ts:iso, type:r.type, source:'manual', editedBy:by};
+      DB.punches.push(np); audit('add',empId,weekKey,np.id,null,{time:r.time,type:r.type},by,reason); changed=true;
+    } else {
+      const p=DB.punches.find(x=>x.id===r.id);
+      const bTime=hhmm(p.ts,e), bType=p.type, bYmd=partsInTz(p.ts,e.tz).ymd;
+      if(bTime!==r.time||bType!==r.type||bYmd!==r.ymd){
+        p.ts=iso; p.type=r.type; p.source='manual'; p.editedBy=by;
+        audit('edit',empId,weekKey,p.id,{time:bTime,type:bType},{time:r.time,type:r.type},by,reason); changed=true;
+      }
+    }
+  });
+  if(changed){
+    const a=getApproval(empId,weekKey);
+    if(a.employee||a.manager||a.hr){
+      DB.approvals[approvalKey(empId,weekKey)]={employee:null,manager:null,hr:null,locked:false};
+      audit('reset',empId,weekKey,null,null,null,by,'Approvals reset after edit');
+    }
+    toast('Timecard updated');
+  }
+  EDIT=null; saveStore(); render();
+}
+
+function renderModal(){
+  const host=document.getElementById('modal');
+  if(!EDIT){ host.innerHTML=''; host.classList.remove('show'); return; }
+  const e=emp(EDIT.empId);
+  const wkEnd=new Date(new Date(EDIT.weekKey+'T00:00:00Z').getTime()+6*86400000).toISOString().slice(0,10);
+  const rowsHtml=EDIT.rows.map((r,i)=>`
+    <tr>
+      <td><input type="date" value="${r.ymd}" min="${EDIT.weekKey}" max="${wkEnd}" onchange="editRow(${i},'ymd',this.value)"></td>
+      <td><input type="time" value="${r.time}" onchange="editRow(${i},'time',this.value)"></td>
+      <td><select onchange="editRow(${i},'type',this.value)">${TYPES.map(t=>`<option value="${t}" ${r.type===t?'selected':''}>${labelType(t)}</option>`).join('')}</select></td>
+      <td><span class="src ${r.source==='biometric'?'bio':''}" style="${!r.id?'background:var(--warnbg);color:var(--warn)':''}">${r.id?r.source:'new'}</span></td>
+      <td><button class="btn ghost sm" onclick="removeRow(${i})"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('');
+  host.innerHTML=`<div class="modalcard">
+    <div class="modalhead">
+      <div><b>Edit punches — ${e.name}</b><div class="hint">${weekLabel(EDIT.weekKey)} · ${TZ[e.tz]}</div></div>
+      <button class="btn ghost sm" onclick="closeEdit()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modalbody">
+      <table><thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Source</th><th></th></tr></thead>
+        <tbody>${rowsHtml||'<tr><td colspan="5" class="empty">No punches. Add one below.</td></tr>'}</tbody></table>
+      <button class="btn ghost sm" style="margin-top:12px" onclick="addRow()"><i class="ti ti-plus"></i> Add punch</button>
+      <div class="field" style="margin-top:16px"><label>Reason for change (required)</label>
+        <input value="${EDIT.reason.replace(/"/g,'&quot;')}" oninput="EDIT.reason=this.value" placeholder="e.g. Employee forgot to clock out"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> Edited punches are marked <b>manual</b>. Saving resets approvals for this week and is recorded in history.</div>
+    </div>
+    <div class="modalfoot">
+      <button class="btn ghost" onclick="closeEdit()">Cancel</button>
+      <button class="btn primary" onclick="saveEdit()"><i class="ti ti-device-floppy"></i> Save changes</button>
+    </div>
+  </div>`;
+  host.classList.add('show');
+}
+
+function renderHistory(empId, weekKey){
+  const items=DB.audit.filter(a=>a.emp===empId&&a.weekKey===weekKey).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  if(!items.length) return '';
+  const desc=a=>({
+    add:`Added ${labelType(a.after.type)} at ${a.after.time}`,
+    edit:`Changed ${a.before.time} ${labelType(a.before.type)} → ${a.after.time} ${labelType(a.after.type)}`,
+    delete:`Deleted ${labelType(a.before.type)} at ${a.before.time}`,
+    reset:`Approvals reset`, unlock:`Timecard unlocked`, excuse:a.reason
+  }[a.action]||a.action);
+  const ic={add:'ti-plus',edit:'ti-pencil',delete:'ti-trash',reset:'ti-rotate',unlock:'ti-lock-open',excuse:'ti-shield-check'};
+  return `<div class="histpanel">
+    <div class="histhead"><i class="ti ti-history"></i> Edit history</div>
+    ${items.map(a=>`<div class="histrow">
+      <i class="ti ${ic[a.action]||'ti-point'}"></i>
+      <div><div class="histmain">${desc(a)}</div>
+      <div class="histmeta">${a.by} · ${new Date(a.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}${a.reason?` · "${a.reason}"`:''}</div></div>
+    </div>`).join('')}
+  </div>`;
+}
+
+/* ============================================================
+   CORRECTION REQUESTS (employee -> manager/HR)
+============================================================ */
+let REQ=null;
+function pendingReqCountFor(u){
+  return DB.requests.filter(r=>r.status==='pending' && (u.role==='hr' || (u.role==='manager' && u.manages?.includes(r.emp)))).length;
+}
+function openRequest(empId, weekKey){
+  EDIT=null;
+  const e=emp(empId);
+  const punches=DB.punches.filter(p=>p.emp===empId && weekKeyFor(p.ts,e)===weekKey).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  REQ={empId, weekKey, kind:'add', targetId:(punches[0]?.id||''), ymd:weekKey, time:'12:00', type:'in', note:'', punches};
+  render();
+}
+function reqSet(f,v){
+  REQ[f]=v;
+  if(f==='kind' && v==='fix' && REQ.targetId){ const p=DB.punches.find(x=>x.id===REQ.targetId); if(p){const e=emp(REQ.empId); REQ.ymd=partsInTz(p.ts,e.tz).ymd; REQ.time=hhmm(p.ts,e); REQ.type=p.type;} }
+  if(f==='targetId'){ const p=DB.punches.find(x=>x.id===v); if(p){const e=emp(REQ.empId); REQ.ymd=partsInTz(p.ts,e.tz).ymd; REQ.time=hhmm(p.ts,e); REQ.type=p.type;} }
+  render();
+}
+function submitRequest(){
+  if(!REQ.note.trim()){ toast('Add a note explaining the correction'); return; }
+  DB.requests.push({
+    id:'r'+Date.now()+Math.random().toString(36).slice(2,5),
+    emp:REQ.empId, weekKey:REQ.weekKey, kind:REQ.kind,
+    targetId:REQ.kind==='fix'?REQ.targetId:null,
+    proposed:{ymd:REQ.ymd, time:REQ.time, type:REQ.type},
+    note:REQ.note, status:'pending', by:me().name, at:new Date().toISOString(),
+    resolvedBy:null, resolvedAt:null, resolveNote:null
+  });
+  REQ=null; saveStore(); toast('Correction request sent to your manager & HR'); render();
+}
+function applyRequest(reqId){
+  const r=DB.requests.find(x=>x.id===reqId); if(!r) return; const e=emp(r.emp);
+  const iso=wallToUtc(r.proposed.ymd, r.proposed.time, e.tz);
+  const reason=`Employee request: ${r.note}`;
+  if(r.kind==='add'){
+    const np={id:'p'+Date.now()+Math.random().toString(36).slice(2,5), emp:r.emp, ts:iso, type:r.proposed.type, source:'manual', editedBy:me().name};
+    DB.punches.push(np); audit('add', r.emp, r.weekKey, np.id, null, {time:r.proposed.time,type:r.proposed.type}, me().name, reason);
+  } else {
+    const p=DB.punches.find(x=>x.id===r.targetId);
+    if(p){ const b={time:hhmm(p.ts,e),type:p.type}; p.ts=iso; p.type=r.proposed.type; p.source='manual'; p.editedBy=me().name;
+      audit('edit', r.emp, r.weekKey, p.id, b, {time:r.proposed.time,type:r.proposed.type}, me().name, reason); }
+  }
+  const a=getApproval(r.emp,r.weekKey);
+  if(a.employee||a.manager||a.hr){ DB.approvals[approvalKey(r.emp,r.weekKey)]={employee:null,manager:null,hr:null,locked:false};
+    audit('reset', r.emp, r.weekKey, null,null,null, me().name, 'Approvals reset after applying request'); }
+  r.status='applied'; r.resolvedBy=me().name; r.resolvedAt=new Date().toISOString();
+  saveStore(); toast('Correction applied'); render();
+}
+function declineRequest(reqId){
+  const r=DB.requests.find(x=>x.id===reqId); if(!r) return;
+  r.status='declined'; r.resolvedBy=me().name; r.resolvedAt=new Date().toISOString();
+  saveStore(); toast('Request declined'); render();
+}
+
+function renderReqBanner(empId, weekKey, openReqs, isEmployeeView){
+  // Employee sees their own pending/resolved status; manager/HR see actionable requests
+  if(isEmployeeView && me().id===empId){
+    const mine=DB.requests.filter(r=>r.emp===empId && r.weekKey===weekKey).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,3);
+    if(!mine.length) return '';
+    return `<div class="reqbanner info">${mine.map(r=>`<div class="reqrow">
+      <i class="ti ti-message-report"></i>
+      <div><b>${reqDesc(r)}</b><div class="reqmeta">${r.status==='pending'?'Waiting on manager/HR':`${r.status} by ${r.resolvedBy}`} · "${r.note}"</div></div>
+      <span class="pill ${r.status==='pending'?'warn':r.status==='applied'?'ok':'neutral'}">${r.status}</span>
+    </div>`).join('')}</div>`;
+  }
+  if(!openReqs.length) return '';
+  return `<div class="reqbanner act">${openReqs.map(r=>`<div class="reqrow">
+    <i class="ti ti-message-report"></i>
+    <div><b>${reqDesc(r)}</b><div class="reqmeta">Requested by ${r.by} · "${r.note}"</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn primary sm" onclick="applyRequest('${r.id}')"><i class="ti ti-check"></i> Apply</button>
+      <button class="btn ghost sm" onclick="declineRequest('${r.id}')">Decline</button>
+    </div>
+  </div>`).join('')}</div>`;
+}
+function reqDesc(r){
+  const when=`${fmt12(r.proposed.time)} ${labelType(r.proposed.type)}`;
+  return r.kind==='add' ? `Add missing punch — ${when}` : `Fix punch → ${when}`;
+}
+
+function renderReqModal(){
+  const host=document.getElementById('modal'); const e=emp(REQ.empId);
+  const wkEnd=new Date(new Date(REQ.weekKey+'T00:00:00Z').getTime()+6*86400000).toISOString().slice(0,10);
+  host.innerHTML=`<div class="modalcard">
+    <div class="modalhead"><div><b>Request a correction</b><div class="hint">${weekLabel(REQ.weekKey)} · ${TZ[e.tz]}</div></div>
+      <button class="btn ghost sm" onclick="closeRequest()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="field" style="margin-bottom:14px"><label>What needs fixing?</label>
+        <select onchange="reqSet('kind',this.value)">
+          <option value="add" ${REQ.kind==='add'?'selected':''}>Add a missing punch</option>
+          <option value="fix" ${REQ.kind==='fix'?'selected':''}>Fix an existing punch</option>
+        </select></div>
+      ${REQ.kind==='fix'?`<div class="field" style="margin-bottom:14px"><label>Which punch?</label>
+        <select onchange="reqSet('targetId',this.value)">
+          ${REQ.punches.length?REQ.punches.map(p=>`<option value="${p.id}" ${REQ.targetId===p.id?'selected':''}>${partsInTz(p.ts,e.tz).ymd} · ${fmtTime(p.ts,e)} · ${labelType(p.type)}</option>`).join(''):'<option>No punches this week</option>'}
+        </select></div>`:''}
+      <div class="formgrid">
+        <div class="field"><label>Date</label><input type="date" value="${REQ.ymd}" min="${REQ.weekKey}" max="${wkEnd}" onchange="reqSet('ymd',this.value)"></div>
+        <div class="field"><label>Time</label><input type="time" value="${REQ.time}" onchange="reqSet('time',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Punch type</label>
+        <select onchange="reqSet('type',this.value)">${TYPES.map(t=>`<option value="${t}" ${REQ.type===t?'selected':''}>${labelType(t)}</option>`).join('')}</select></div>
+      <div class="field" style="margin-top:14px"><label>Note for your manager (required)</label>
+        <input value="${REQ.note.replace(/"/g,'&quot;')}" oninput="REQ.note=this.value" placeholder="e.g. Forgot to clock out, left at 5:00pm"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> This sends a request — it does not change your timecard. Your manager and HR will be notified to review it.</div>
+    </div>
+    <div class="modalfoot">
+      <button class="btn ghost" onclick="closeRequest()">Cancel</button>
+      <button class="btn primary" onclick="submitRequest()"><i class="ti ti-send"></i> Send request</button>
+    </div>
+  </div>`;
+  host.classList.add('show');
+}
+function closeRequest(){ REQ=null; render(); }
+
+/* ============================================================
+   NAV / RENDER
+============================================================ */
+const SCREENS = [
+  {id:'dash',      label:'My Dashboard',  icon:'ti-layout-dashboard', roles:['hr','manager']},
+  {id:'hours',     label:'Hours',         icon:'ti-clock-hour-4', badge:'req', roles:['hr','manager']},
+  {id:'schedules', label:'Schedules',     icon:'ti-calendar-event', roles:['hr','manager']},
+  {id:'notify',    label:'Notifications', icon:'ti-bell', badge:'alert', roles:['hr','manager']},
+  {id:'employee',  label:'Employee',      icon:'ti-user', roles:['hr']},
+  {id:'reports',   label:'Reports',       icon:'ti-file-text', roles:['hr','manager']},
+  {id:'config',    label:'Configuration', icon:'ti-settings', roles:['hr']}
+];
+let SCREEN = 'dash';
+
+function nav(id){ SCREEN=id; render(); }
+function signInAs(id){ CURRENT=id; const u=me();
+  if(!SCREENS.find(s=>s.id===SCREEN)?.roles.includes(u.role)) SCREEN='dash';
+  HOURS=null; SCHED=null; REPORT=null; render();
+}
+
+function renderNav(){
+  const u=me(); const reqN = pendingReqCountFor(u); const alertN = alertsFor(u).length;
+  document.getElementById('nav').innerHTML =
+    SCREENS.filter(s=>s.roles.includes(u.role)).map(s=>{
+      const n = s.badge==='req'?reqN : s.badge==='alert'?alertN : 0;
+      const badge = n ? `<span class="navbadge">${n}</span>` : '';
+      return `<button class="navitem ${SCREEN===s.id?'active':''}" onclick="nav('${s.id}')"><i class="ti ${s.icon}"></i>${s.label}${badge}</button>`;
+    }).join('');
+  const chooser=document.getElementById('signIn');
+  if(chooser) chooser.innerHTML = DB.employees.filter(e=>e.role!=='employee')
+    .map(e=>`<option value="${e.id}" ${e.id===CURRENT?'selected':''}>${e.name} · ${e.role==='hr'?'HR':'Manager'}</option>`).join('');
+}
+
+function topbar(){
+  const n = DB.employees.filter(e=>e.role==='employee').length;
+  return `<div class="topbar">
+    <div class="tb-meta">
+      <span><b>Company</b> WS Display</span>
+      <span><b>Week</b> ${weekLabel(currentWeekKey(me()))}</span>
+      <span>${n} employees</span>
+    </div>
+    <div class="tb-actions">
+      <button class="btn ghost sm" onclick="render()"><i class="ti ti-refresh"></i> Refresh</button>
+      <span class="tb-chip"><i class="ti ti-user-circle"></i> ${me().name}</span>
+    </div>
+  </div>`;
+}
+
+function placeholder(title, icon, desc, bullets){
+  return `<div class="pagehead"><div><h1>${title}</h1><p>${desc}</p></div></div>
+    <div class="card"><div class="ph"><i class="ti ${icon}"></i>
+      <h3>${title} — ready to build</h3>
+      <p>Tell me what this tab should include and I'll wire it up.</p>
+      ${bullets?`<ul class="ph-list">${bullets.map(b=>`<li>${b}</li>`).join('')}</ul>`:''}
+    </div></div>`;
+}
+
+function render(){
+  renderNav();
+  const view = ({
+    dash:viewDash,
+    hours:viewHours,
+    employee:viewEmployee,
+    schedules:viewSchedules,
+    reports:viewReports,
+    notify:viewNotifications,
+    config:viewConfig
+  })[SCREEN];
+  document.getElementById('main').innerHTML = view();
+  // overlay sync (keeps modal state consistent across re-renders)
+  const host=document.getElementById('modal');
+  if(EDIT) renderModal();
+  else if(REQ) renderReqModal();
+  else if(SEDIT) renderSchedModal();
+  else if(LEDIT) renderLeaveModal();
+  else if(OEDIT) renderOccModal();
+  else if(PEDIT) renderPremiumModal();
+  else if(HEDIT) renderHolidayModal();
+  else if(NEDIT) renderNoteModal();
+  else if(PUNCH) renderPunchModal();
+  else if(PAYVIEW) renderPayModal();
+  else { host.innerHTML=''; host.classList.remove('show'); }
+}
+
+/* ---------- DASHBOARD ---------- */
+function scopeEmployees(){
+  const u=me();
+  if(u.role==='hr') return DB.employees.filter(e=>e.role==='employee');
+  if(u.role==='manager') return DB.employees.filter(e=>u.manages?.includes(e.id));
+  return [me()];
+}
+
+/* ---------- NOTIFICATIONS / ALERTS ---------- */
+// cutoff = the Tuesday after the current pay period ends (11am)
+function periodCutoff(){ const t=todayYmd(me()); const pp=payPeriodStart(t); return ymdAdd(ymdAdd(pp,13),2); }
+// per-employee alerts across the current pay period; also period-level (unapproved before cutoff)
+function alertsFor(u){
+  const scope = u.role==='hr' ? DB.employees.filter(e=>e.role==='employee')
+              : DB.employees.filter(e=>u.manages?.includes(e.id));
+  const t=todayYmd(me()); const start=payPeriodStart(t), stop=ymdAdd(start,13);
+  const cutoff=periodCutoff(); const daysToCutoff=Math.round((Date.parse(cutoff)-Date.parse(t))/86400000);
+  const out=[];
+  scope.forEach(e=>{
+    // missing punches + meal premiums (per day, this period)
+    let cur=start;
+    while(cur<=stop && cur<=t){
+      const wk=weekKeyFor(cur+'T12:00:00Z',e); const tc=buildTimecard(e.id,wk); const d=tc.days.find(x=>x.ymd===cur);
+      if(d){
+        d.exceptions.forEach(x=>{
+          if((x.includes('Missing')||x.includes('no In')) && !isExcused(e.id,cur,x))
+            out.push({emp:e.id, to:'employee', type:'punch', date:cur, msg:`Missing punch on ${md(cur)} — needs correction`});
+        });
+        if(d.mealViol){ const flag=d.exceptions.find(x=>x.includes('premium'));
+          if(flag && !isExcused(e.id,cur,flag)) out.push({emp:e.id, to:'employee', type:'premium', date:cur, msg:`Meal premium earned on ${md(cur)} (1 hr)`}); }
+      }
+      cur=ymdAdd(cur,1);
+    }
+    // attendance occurrences this period
+    periodOccurrences(e.id,start,stop).forEach(o=>{ if(!o.excused) out.push({emp:e.id, to:'employee', type:'occurrence', date:o.date, msg:`Attendance: ${OCC_TYPES[o.code].label} on ${md(o.date)} (+${o.points} pt)`}); });
+    // tier crossing
+    const pts=rollingPoints(e.id); const tier=disciplineTier(pts);
+    if(pts>=6) out.push({emp:e.id, to:'manager', type:'tier', date:t, msg:`${e.name} at ${pts} pts — ${tier.label}`});
+    // unapproved before cutoff
+    if(daysToCutoff<=3 && daysToCutoff>=0){
+      let w=start, need=false; while(w<=stop){ const a=getApproval(e.id,w); if(!(a.manager && a.hr)) need=true; w=ymdAdd(w,7); }
+      if(need) out.push({emp:e.id, to:'manager', type:'approval', date:cutoff, msg:`${e.name}'s timecard not fully approved — cutoff ${md(cutoff)} 11am`});
+    }
+  });
+  return out.map(a=>({...a, key:`${a.emp}|${a.type}|${a.date}`})).filter(a=>!DB.ackAlerts[a.key]);
+}
+function md(ymd){ return ymdD(ymd).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}); }
+function ackAlert(key){ DB.ackAlerts[key]={by:me().name, at:new Date().toISOString()}; saveStore(); render(); }
+function ackAllFor(empId){ alertsFor(me()).filter(a=>a.emp===empId).forEach(a=>DB.ackAlerts[a.key]={by:me().name,at:new Date().toISOString()}); saveStore(); render(); }
+
+function viewNotifications(){
+  const u=me(); const alerts=alertsFor(u);
+  const cutoff=periodCutoff();
+  const ic={punch:'ti-alarm',premium:'ti-cash-banknote',occurrence:'ti-calendar-stats',tier:'ti-alert-triangle',approval:'ti-checkbox'};
+  const tone={punch:'warn',premium:'ok',occurrence:'warn',tier:'bad',approval:'warn'};
+  // group by employee
+  const byEmp={}; alerts.forEach(a=>{ (byEmp[a.emp]=byEmp[a.emp]||[]).push(a); });
+  const emps=Object.keys(byEmp).sort((a,b)=>emp(a).name.localeCompare(emp(b).name));
+  return `<div class="pagehead"><div><h1>Notifications</h1><p>Per-employee alerts for ${u.role==='hr'?'all employees':'your team'} · cutoff ${md(cutoff)} 11:00 AM.</p></div></div>
+  <div class="hint" style="margin-bottom:14px"><i class="ti ti-info-circle"></i> Employee alerts (missing punches, premiums earned, occurrences) also surface in each person's web clock. Manager/HR alerts appear here.</div>
+  ${emps.length? emps.map(id=>{const e=emp(id);const list=byEmp[id];
+    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2 style="margin:0"><i class="ti ti-user-circle"></i> ${e.name} <span class="src">${e.empId}</span></h2>
+      <div style="display:flex;align-items:center;gap:12px"><span class="hint">${e.dept} · ${e.loc}${e.webPunch?' · <span class="pill ok">web clock</span>':' · <span class="pill neutral">biometric only</span>'}</span>
+      ${list.length>1?`<button class="btn ghost sm" onclick="ackAllFor('${id}')"><i class="ti ti-checks"></i> Acknowledge all</button>`:''}</div></div>
+      ${list.map(a=>`<div class="listrow"><div style="display:flex;align-items:center;gap:10px">
+        <i class="ti ${ic[a.type]}" style="font-size:19px;color:var(--${tone[a.type]==='bad'?'bad':tone[a.type]==='ok'?'ok':'warn'})"></i>
+        <div><b>${a.msg}</b><div class="listsub">${a.to==='employee'?'Sent to employee (web clock)':'For manager / HR'}</div></div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="pill ${tone[a.type]}">${a.type}</span>
+        <button class="ackbtn" title="Acknowledge / dismiss" onclick="ackAlert('${a.key}')"><i class="ti ti-check"></i></button></div></div>`).join('')}
+    </div>`;}).join('')
+    : `<div class="card"><div class="empty">No alerts right now — all caught up.</div></div>`}`;
+}
+function needsMyApproval(){
+  const u=me(); const out=[];
+  scopeEmployees().forEach(e=>{
+    const wk=currentWeekKey(e); const a=getApproval(e.id,wk);
+    if(u.role==='employee' && !a.employee) out.push({e,wk});
+    else if(u.role==='manager' && a.employee && !a.manager) out.push({e,wk});
+    else if(u.role==='hr' && a.manager && !a.hr) out.push({e,wk});
+  });
+  return out;
+}
+function kpi(icon,label,value,sub,tone){
+  return `<div class="kpi ${tone||''}"><div class="kpi-ic"><i class="ti ${icon}"></i></div>
+    <div class="kpi-val">${value}</div><div class="kpi-lbl">${label}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
+}
+function widget(icon,title,count,body,jump,countTone){
+  return `<div class="widget">
+    <div class="whead">
+      <div class="wtitle"><span class="wic"><i class="ti ${icon}"></i></span>${title}</div>
+      ${(count!==undefined&&count!=='')?`<div class="wcount ${countTone||''}">${count}</div>`:''}
+    </div>
+    <div class="wbody">${body}</div>
+    ${jump?`<div class="wfoot"><button class="btn ghost sm" onclick="nav('${jump.screen}')">${jump.label} <i class="ti ti-arrow-right"></i></button></div>`:''}
+  </div>`;
+}
+function donut(segs,center){
+  const sum=segs.reduce((s,x)=>s+x.val,0)||1; let acc=0;
+  const stops=segs.map(s=>{const a=acc/sum*100;acc+=s.val;const b=acc/sum*100;return `${s.color} ${a}% ${b}%`;}).join(',');
+  return `<div class="donutwrap"><div class="donut" style="background:conic-gradient(${stops})"><div class="donuthole">${center}</div></div>
+    <div class="donutleg">${segs.map(s=>`<div class="legrow"><span class="legdot" style="background:${s.color}"></span>${s.label} · <b>${h2(s.val)}</b> · ${Math.round(s.val/sum*100)}%</div>`).join('')||'<div class="empty">No hours yet.</div>'}</div></div>`;
+}
+
+function viewDash(){
+  const u=me(); const first=u.name.split(' ')[0];
+  const hr=+new Intl.DateTimeFormat('en-US',{timeZone:u.tz,hour:'2-digit',hour12:false}).format(new Date());
+  const greet=hr<12?'Good morning':hr<18?'Good afternoon':'Good evening';
+  const today=new Intl.DateTimeFormat('en-US',{timeZone:u.tz,weekday:'long',month:'long',day:'numeric'}).format(new Date());
+  const wk=currentWeekKey(u);
+  const scope=scopeEmployees();
+  const approvals=needsMyApproval();
+  const reqs=DB.requests.filter(r=>r.status==='pending' && (u.role==='hr' || (u.role==='manager' && u.manages?.includes(r.emp)) || (u.role==='employee' && r.emp===u.id)));
+  const excRows=[];
+  scope.forEach(e=>buildTimecard(e.id,currentWeekKey(e)).days.forEach(d=>{
+    const active=d.exceptions.filter(x=>!isExcused(e.id,d.ymd,x));
+    if(active.length) excRows.push({e,d:{...d,exceptions:active}});
+  }));
+
+  const cta = u.role==='employee'
+    ? `<button class="btn hero-cta" onclick="nav('clock')"><i class="ti ti-clock-play"></i> Go to Web Clock</button>
+       <button class="btn hero-cta ghost" onclick="nav('mycard')"><i class="ti ti-id-badge-2"></i> My Timecard</button>`
+    : `<button class="btn hero-cta" onclick="nav('hours')"><i class="ti ti-checklist"></i> Review timecards</button>`;
+
+  const hero = `
+  <div class="hero">
+    <div class="hero-txt">
+      <div class="hero-eyebrow">${u.role.toUpperCase()} · ${TZ[u.tz]}</div>
+      <h2>${greet}, ${first}</h2>
+      <p>${u.role==='employee'?"Here's your week at a glance.":`You're overseeing ${scope.length} ${scope.length===1?'employee':'employees'} this pay period.`}</p>
+      <div class="hero-actions">${cta}</div>
+    </div>
+    <div class="hero-badge"><i class="ti ti-clock-hour-4"></i></div>
+  </div>
+  <div class="dash-meta">
+    <span><b>Company</b> WS Display</span>
+    <span><b>Pay week</b> ${weekLabel(wk)}</span>
+    <span><b>${scope.length}</b> ${scope.length===1?'employee':'employees'} in view</span>
+    <span style="margin-left:auto">${today}</span>
+  </div>`;
+
+  /* ---- EMPLOYEE: focused personal view ---- */
+  if(u.role==='employee'){
+    const tc=buildTimecard(u.id,wk); const st=empStatus(u.id); const a=getApproval(u.id,wk);
+    const stMap={out:['Clocked out','neutral'],in:['On the clock','ok'],meal:['On meal','warn'],break:['On break','warn']};
+    const kpis=[
+      kpi('ti-clock-hour-4','Hours this week',h2(tc.total),`Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}`),
+      kpi('ti-point-filled','Current status',stMap[st][0],'',stMap[st][1]),
+      kpi('ti-checkbox',a.employee?'Attested':'Not attested',a.employee?'Done':'Pending',a.locked?'Locked':'',a.employee?'ok':'warn'),
+      kpi('ti-message-report','My requests',DB.requests.filter(r=>r.emp===u.id&&r.status==='pending').length,'pending')
+    ].join('');
+    const mine=DB.requests.filter(r=>r.emp===u.id).sort((x,y)=>new Date(y.at)-new Date(x.at)).slice(0,5);
+    return hero + `<div class="kpis">${kpis}</div>
+    <div class="dashgrid">
+      <div class="card"><h2><i class="ti ti-alert-triangle"></i> My exceptions ${excRows.length?`<span class="cbadge">${excRows.length}</span>`:''}</h2>
+        ${excRows.length? excRows.map(({d})=>{const dt=new Date(d.ymd+'T00:00:00Z');
+          return `<div class="listrow"><div><b>${dt.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})}</b>
+            <div class="listsub">${d.exceptions.join(' · ')}</div></div></div>`;}).join('')
+          : `<div class="empty">No exceptions this week.</div>`}</div>
+      <div class="card"><h2><i class="ti ti-message-report"></i> My requests</h2>
+        ${mine.length? mine.map(r=>`<div class="listrow"><div><b>${reqDesc(r)}</b><div class="listsub">"${r.note}"</div></div>
+          <span class="pill ${r.status==='pending'?'warn':r.status==='applied'?'ok':'neutral'}">${r.status}</span></div>`).join('')
+          : `<div class="empty">No correction requests.</div>`}</div>
+    </div>`;
+  }
+
+  /* ---- MANAGER / HR: Namely-style widget board ---- */
+  const stM={out:['Out','neutral'],in:['Clocked In','ok'],meal:['On meal','warn'],break:['On break','warn']};
+  const statuses=scope.map(e=>({e,s:empStatus(e.id)}));
+  const clockedIn=statuses.filter(x=>x.s!=='out').length;
+  const wStatus = widget('ti-users','Employee Status',clockedIn,
+    `<table class="wtable"><thead><tr><th>Name</th><th>ID</th><th>Clock status</th></tr></thead><tbody>
+      ${statuses.map(({e,s})=>`<tr><td>${e.name}</td><td>${e.empId||'—'}</td><td><span class="pill ${stM[s][1]}">${stM[s][0]}</span></td></tr>`).join('')}
+    </tbody></table>`);
+
+  const otList=scope.map(e=>{const tc=buildTimecard(e.id,currentWeekKey(e));const rule=ruleFor(e);
+      const over=tc.ot+tc.dt; const remain=rule.weekly-tc.total; return {e,tc,over,remain};})
+    .filter(x=>x.over>0 || (x.remain<=8 && x.tc.total>0)).sort((a,b)=>b.over-a.over);
+  const wOT = widget('ti-flame','Approaching Overtime',otList.length,
+    otList.length? `<table class="wtable"><thead><tr><th>Name</th><th>Status</th></tr></thead><tbody>
+      ${otList.map(x=>`<tr><td>${x.e.name}</td><td>${x.over>0?`<span style="color:var(--bad);font-weight:600">${h2(x.over)} into OT</span>`:`<span style="color:var(--warn)">${h2(x.remain)} to OT</span>`}</td></tr>`).join('')}
+    </tbody></table>` : `<div class="empty">Nobody near overtime.</div>`,
+    null, otList.some(x=>x.over>0)?'bad':'warn');
+
+  const wReq = widget('ti-message-report','Correction Requests',reqs.length,
+    reqs.length? reqs.map(r=>`<div class="wrow"><div><b>${emp(r.emp).name}</b><div class="listsub">${reqDesc(r)} · "${r.note}"</div></div>
+      <div class="wactions"><button class="iconbtn ok" title="Apply" onclick="applyRequest('${r.id}')"><i class="ti ti-check"></i></button>
+      <button class="iconbtn bad" title="Decline" onclick="declineRequest('${r.id}')"><i class="ti ti-x"></i></button></div></div>`).join('')
+      : `<div class="empty">No open requests.</div>`,
+    {screen:'hours',label:'Jump to Hours'}, reqs.length?'warn':'');
+
+  const locC={CA:'#16a34a',PA:'#3b82f6'};
+  const byLoc={}; scope.forEach(e=>{byLoc[e.loc]=(byLoc[e.loc]||0)+buildTimecard(e.id,currentWeekKey(e)).total;});
+  const segs=Object.entries(byLoc).filter(([k,v])=>v>0).map(([k,v])=>({label:k,val:v,color:locC[k]||'#94a3b8'}));
+  const totalH=segs.reduce((s,x)=>s+x.val,0);
+  const wHours = widget('ti-chart-donut','Hours by Location',h2(totalH),
+    donut(segs, `<b>${h2(totalH)}</b><span>hrs</span>`));
+
+  const appr=scope.map(e=>getApproval(e.id,currentWeekKey(e)));
+  const approved=appr.filter(a=>a.locked).length; const totalCards=appr.length||1;
+  const pct=Math.round(approved/totalCards*100);
+  const wAppr = widget('ti-progress-check','Approval Completion',`${approved}/${appr.length}`,
+    `<div class="stack"><div class="seg ok" style="width:${pct}%"></div><div class="seg warn" style="width:${100-pct}%"></div></div>
+     <div class="stackleg"><span><span class="legdot" style="background:var(--ok)"></span> Approved · ${approved}</span>
+       <span><span class="legdot" style="background:var(--warn)"></span> Unapproved · ${appr.length-approved}</span></div>
+     <div class="hint" style="margin-top:8px">${pct}% of timecards fully signed off this week.</div>`);
+
+  const wExc = widget('ti-alert-triangle','Clock Exceptions',excRows.length,
+    excRows.length? `<table class="wtable"><thead><tr><th>Name</th><th>Type</th><th>Day</th></tr></thead><tbody>
+      ${excRows.map(({e,d})=>{const dt=new Date(d.ymd+'T00:00:00Z');
+        return `<tr><td>${e.name}</td><td style="color:var(--bad)">${d.exceptions.join(', ')}</td><td>${dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}</td></tr>`;}).join('')}
+    </tbody></table>` : `<div class="empty">No exceptions flagged.</div>`,
+    {screen:'hours',label:'Jump to Hours'}, excRows.length?'bad':'');
+
+  const wNeed = widget('ti-checklist',u.role==='hr'?'Awaiting HR Approval':'Awaiting My Approval',approvals.length,
+    approvals.length? approvals.map(({e,wk})=>{const tc=buildTimecard(e.id,wk);
+      return `<div class="wrow" onclick="nav('hours')" style="cursor:pointer"><div><b>${e.name}</b>
+        <div class="listsub">${h2(tc.total)} hrs${tc.anyExc?' · <span style="color:var(--bad)">exceptions</span>':''}</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--muted)"></i></div>`;}).join('')
+      : `<div class="empty">All caught up.</div>`,
+    {screen:'hours',label:'Review in Hours'}, approvals.length?'warn':'');
+
+  const attList=scope.map(e=>({e,pts:rollingPoints(e.id)})).filter(x=>x.pts>0).sort((a,b)=>b.pts-a.pts);
+  const wAtt = widget('ti-calendar-stats','Attendance Points',attList.length,
+    attList.length? `<table class="wtable"><thead><tr><th>Name</th><th class="num">Pts</th><th>Standing</th></tr></thead><tbody>
+      ${attList.map(x=>{const t=disciplineTier(x.pts);return `<tr><td>${x.e.name}</td><td class="num">${x.pts}</td><td><span class="pill ${t.tone}">${t.label}</span></td></tr>`;}).join('')}
+    </tbody></table>` : `<div class="empty">No active attendance points.</div>`,
+    {screen:'hours',label:'Open Hours'}, attList.some(x=>x.pts>=6)?'bad':'');
+
+  const myAlerts=alertsFor(u);
+  const wAlert = widget('ti-bell','Alerts',myAlerts.length,
+    myAlerts.length? myAlerts.slice(0,8).map(a=>`<div class="wrow"><div><b>${emp(a.emp).name}</b><div class="listsub">${a.msg}</div></div><span class="pill ${a.type==='tier'?'bad':a.type==='premium'?'ok':'warn'}">${a.type}</span></div>`).join('')
+      : `<div class="empty">No alerts.</div>`,
+    {screen:'notify',label:'Open Notifications'}, myAlerts.some(a=>a.type==='tier'||a.type==='approval')?'bad':'warn');
+
+  return hero + `<div class="wboard">${wStatus}${wAlert}${wOT}${wNeed}${wAtt}${wHours}${wReq}${wAppr}${wExc}</div>`;
+}
+
+/* ---------- PUNCH STATUS (fed by biometric clock + external web clock) ---------- */
+function empStatus(empId){
+  const e = emp(empId);
+  const last = DB.punches.filter(p=>p.emp===empId).sort((a,b)=>new Date(b.ts)-new Date(a.ts))[0];
+  if(!last) return 'out';
+  if(last.type==='in'||last.type==='meal_end'||last.type==='break_end') return 'in';
+  if(last.type==='meal_start') return 'meal';
+  if(last.type==='break_start') return 'break';
+  return 'out';
+}
+function labelType(t){return {in:'Clock In',out:'Clock Out',meal_start:'Meal start',meal_end:'Meal end',break_start:'Break start',break_end:'Break end'}[t]||t;}
+
+/* ---------- TIMECARD (shared renderer) ---------- */
+function h2(n){ const h=Math.floor(n); const m=Math.round((n-h)*60); return `${h}:${String(m).padStart(2,'0')}`; }
+/* ---- segment engine + per-row E/M/O approval + segment notes ---- */
+const LAYER_BY={E:'employee',M:'manager',O:'hr'};
+function daySegments(punches){
+  const segs=[]; let seg=null; let pend=null;
+  [...punches].sort((a,b)=>new Date(a.ts)-new Date(b.ts)).forEach(p=>{
+    const t=new Date(p.ts).getTime();
+    if(p.type==='in'||p.type==='meal_end'||p.type==='break_end'){
+      if(pend && segs.length){ const prev=segs[segs.length-1]; prev.breakMin=(t-pend.t)/60000; prev.breakPaid=pend.paid; }
+      pend=null; seg={inId:p.id, outId:null, in:p.ts, out:null, hrs:0, breakMin:null, breakPaid:false, manual:p.source==='manual'};
+    } else if(p.type==='out'||p.type==='meal_start'||p.type==='break_start'){
+      if(seg){ seg.out=p.ts; seg.outId=p.id; seg.hrs=(t-new Date(seg.in).getTime())/3600000; if(p.source==='manual')seg.manual=true; segs.push(seg); seg=null; }
+      pend = p.type==='meal_start' ? {t,paid:false} : p.type==='break_start' ? {t,paid:true} : null;
+    }
+  });
+  if(seg) segs.push(seg);
+  return segs;
+}
+function segKey(inId,L){return `${inId}|${L}`;}
+function segApproved(inId,L){return !!DB.segApprovals[segKey(inId,L)];}
+function canToggleLayer(L,empId){ const u=me();
+  if(u.role==='hr') return true;
+  if(u.role==='manager' && L==='M' && u.manages?.includes(empId)) return true;
+  return false;
+}
+function weekSegIds(empId,weekKey){ const ids=[]; buildTimecard(empId,weekKey).days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); return ids; }
+function recomputeWeekApproval(empId,weekKey){
+  const ids=weekSegIds(empId,weekKey); const a=getApproval(empId,weekKey); const now=new Date().toISOString();
+  ['E','M','O'].forEach(L=>{ const layer=LAYER_BY[L]; const all=ids.length>0 && ids.every(id=>segApproved(id,L));
+    if(all && !a[layer]) a[layer]={by:me().name,at:now}; else if(!all && a[layer]) a[layer]=null; });
+  a.locked = !!(a.employee&&a.manager&&a.hr);
+}
+function toggleSeg(inId,L,empId,weekKey){
+  if(!canToggleLayer(L,empId) || getApproval(empId,weekKey).locked) return;
+  const k=segKey(inId,L); if(DB.segApprovals[k]) delete DB.segApprovals[k]; else DB.segApprovals[k]={by:me().name,at:new Date().toISOString()};
+  recomputeWeekApproval(empId,weekKey); saveStore(); render();
+}
+function checkAllSeg(empId,weekKey,L){
+  if(!canToggleLayer(L,empId) || getApproval(empId,weekKey).locked) return;
+  const ids=weekSegIds(empId,weekKey); const allOn=ids.length>0 && ids.every(id=>segApproved(id,L));
+  ids.forEach(id=>{ const k=segKey(id,L); if(allOn) delete DB.segApprovals[k]; else DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; });
+  recomputeWeekApproval(empId,weekKey); saveStore(); render();
+}
+function approveAllSegs(empId,weekKey){ const now=new Date().toISOString(); weekSegIds(empId,weekKey).forEach(id=>['E','M','O'].forEach(L=>DB.segApprovals[segKey(id,L)]={by:me().name,at:now})); }
+
+/* segment note modal */
+let NEDIT=null;
+function openSegNote(inId,empId){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;
+  NEDIT={inId, text:DB.segNotes[inId]||''}; render(); }
+function closeSegNote(){ NEDIT=null; render(); }
+function saveSegNote(){ if(NEDIT.text.trim()) DB.segNotes[NEDIT.inId]=NEDIT.text.trim(); else delete DB.segNotes[NEDIT.inId]; NEDIT=null; saveStore(); render(); }
+/* single-punch add/edit modal (click a line to edit, or Add punch) */
+let PUNCH=null;
+function resetWeekApprovals(empId, weekKey){
+  weekSegIds(empId,weekKey).forEach(id=>['E','M','O'].forEach(L=>delete DB.segApprovals[segKey(id,L)]));
+  const a=DB.approvals[approvalKey(empId,weekKey)]; if(a){a.employee=null;a.manager=null;a.hr=null;a.locked=false;}
+}
+function openPunch(empId, weekKey, punchId){
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;
+  if(getApproval(empId,weekKey).locked){ toast('Period is locked — reopen it to edit'); return; }
+  const e=emp(empId);
+  if(punchId){ const p=DB.punches.find(x=>x.id===punchId); if(!p) return;
+    PUNCH={mode:'edit', id:punchId, empId, weekKey, ymd:partsInTz(p.ts,e.tz).ymd, time:hhmm(p.ts,e), type:p.type, reason:''}; }
+  else PUNCH={mode:'add', id:null, empId, weekKey, ymd:weekKey, time:'08:00', type:'in', reason:''};
+  render();
+}
+function puSet(f,v){ PUNCH[f]=v; }
+function closePunch(){ PUNCH=null; render(); }
+// find the in-punch id of the segment a given punch belongs to (so the note lands on that row)
+function segInIdForPunch(empId, ymd, punchId){
+  const e=emp(empId);
+  const dayP=DB.punches.filter(p=>p.emp===empId && partsInTz(p.ts,e.tz).ymd===ymd);
+  const segs=daySegments(dayP);
+  const s=segs.find(x=>x.inId===punchId) || segs.find(x=>x.outId===punchId);
+  return s?s.inId:punchId;
+}
+function savePunch(){
+  if(!PUNCH.reason.trim()){ toast('Add a reason for the adjustment'); return; }
+  const e=emp(PUNCH.empId); const iso=wallToUtc(PUNCH.ymd, PUNCH.time, e.tz); const by=me().name; const reason=PUNCH.reason.trim();
+  let targetId=PUNCH.id;
+  if(PUNCH.mode==='add'){
+    targetId='p'+Date.now()+Math.random().toString(36).slice(2,5);
+    DB.punches.push({id:targetId, emp:PUNCH.empId, ts:iso, type:PUNCH.type, source:'manual', editedBy:by});
+    audit('add',PUNCH.empId,PUNCH.weekKey,targetId,null,{time:PUNCH.time,type:PUNCH.type},by,reason);
+  } else {
+    const p=DB.punches.find(x=>x.id===PUNCH.id); const b={time:hhmm(p.ts,e),type:p.type};
+    p.ts=iso; p.type=PUNCH.type; p.source='manual'; p.editedBy=by;
+    audit('edit',PUNCH.empId,PUNCH.weekKey,p.id,b,{time:PUNCH.time,type:PUNCH.type},by,reason);
+  }
+  // put the reason into the Notes for the affected segment's row
+  DB.segNotes[segInIdForPunch(PUNCH.empId, PUNCH.ymd, targetId)] = reason;
+  resetWeekApprovals(PUNCH.empId, PUNCH.weekKey);
+  PUNCH=null; saveStore(); toast('Punch saved'); render();
+}
+function deletePunch(){
+  if(!PUNCH.reason.trim()){ toast('Add a reason for the adjustment'); return; }
+  if(PUNCH.id){ DB.punches=DB.punches.filter(x=>x.id!==PUNCH.id);
+    audit('delete',PUNCH.empId,PUNCH.weekKey,PUNCH.id,{time:PUNCH.time,type:PUNCH.type},null,me().name,PUNCH.reason.trim());
+    resetWeekApprovals(PUNCH.empId,PUNCH.weekKey); }
+  PUNCH=null; saveStore(); toast('Punch removed'); render();
+}
+function renderPunchModal(){
+  const host=document.getElementById('modal'); const e=emp(PUNCH.empId); const wkEnd=ymdAdd(PUNCH.weekKey,6);
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${PUNCH.mode==='add'?'Add':'Edit'} punch</b><div class="hint">${e.name} · ${weekLabel(PUNCH.weekKey)}</div></div>
+    <button class="btn ghost sm" onclick="closePunch()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="field"><label>Type</label><select onchange="puSet('type',this.value)">${TYPES.map(t=>`<option value="${t}" ${PUNCH.type===t?'selected':''}>${labelType(t)}</option>`).join('')}</select></div>
+      <div class="formgrid" style="margin-top:14px">
+        <div class="field"><label>Date</label><input type="date" value="${PUNCH.ymd}" min="${PUNCH.weekKey}" max="${wkEnd}" onchange="puSet('ymd',this.value)"></div>
+        <div class="field"><label>Time</label><input type="time" value="${PUNCH.time}" onchange="puSet('time',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Reason for adjustment (required)</label>
+        <input value="${(PUNCH.reason||'').replace(/"/g,'&quot;')}" oninput="PUNCH.reason=this.value" placeholder="e.g. Employee forgot to clock out"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> The reason is saved to this row's Notes and the timecard history, and resets the week's approvals.</div>
+    </div>
+    <div class="modalfoot">${PUNCH.mode==='edit'?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deletePunch()"><i class="ti ti-trash"></i> Delete</button>`:''}
+      <button class="btn ghost" onclick="closePunch()">Cancel</button><button class="btn primary" onclick="savePunch()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+
+function renderNoteModal(){
+  const host=document.getElementById('modal');
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>Segment note</b></div>
+    <button class="btn ghost sm" onclick="closeSegNote()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody"><div class="field"><label>Note</label>
+      <input value="${(NEDIT.text||'').replace(/"/g,'&quot;')}" oninput="NEDIT.text=this.value" placeholder="e.g. Approved early departure"></div></div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closeSegNote()">Cancel</button><button class="btn primary" onclick="saveSegNote()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+
+function fmtDT(iso,e){ const d=new Intl.DateTimeFormat('en-US',{timeZone:e.tz,month:'numeric',day:'numeric'}).format(new Date(iso)); return `${d} ${fmtTime(iso,e)}`; }
+
+function renderTimecard(empId, weekKey, viewerLayer){
+  const tc = buildTimecard(empId, weekKey);
+  const e = tc.e; const a = getApproval(empId, weekKey);
+  const ids = weekSegIds(empId, weekKey);
+  const allChk = L => ids.length>0 && ids.every(id=>segApproved(id,L));
+  const cnt = L => ids.filter(id=>segApproved(id,L)).length;
+  const box = (inId,L) => `<input type="checkbox" ${segApproved(inId,L)?'checked':''} ${(canToggleLayer(L,empId)&&!a.locked)?'':'disabled'} onchange="toggleSeg('${inId}','${L}','${empId}','${weekKey}')">`;
+  const hdr = (L,lbl) => { const on=canToggleLayer(L,empId)&&!a.locked; return `<th class="apcol ${on?'clickable':''}" ${on?`onclick="checkAllSeg('${empId}','${weekKey}','${L}')"`:''} title="${on?'Check all':'View only'}">${lbl}${allChk(L)?' <i class="ti ti-check" style="color:var(--ok)"></i>':''}</th>`; };
+
+  let body=''; const days=tc.days;
+  days.forEach((d,di)=>{
+    const dt=new Date(d.ymd+'T00:00:00Z');
+    const wd=dt.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'});
+    const dayExc = d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).length>0;
+    const segs=daySegments(d.punches);
+    const shift=segs.reduce((s,x)=>s+x.hrs,0);
+    const editable = can('edit',empId) && !a.locked;
+    if(!segs.length){
+      body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td colspan="3"></td><td></td><td></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
+    }
+    segs.forEach((s,si)=>{
+      const note=DB.segNotes[s.inId];
+      const bl=s.breakMin!=null?`${Math.round(s.breakMin)}${s.breakPaid?'p':'u'}`:'';
+      const last=si===segs.length-1;
+      const veryLast=di===days.length-1 && last;
+      const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}`;
+      const outCell=s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>';
+      body+=`<tr class="${si===0?'tc-day':''}">
+        <td>${dayExc?`<span class="dot" title="${d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).join('; ')}"></span>`:''}</td>
+        <td class="apcol">${box(s.inId,'E')}</td><td class="apcol">${box(s.inId,'M')}</td><td class="apcol">${box(s.inId,'O')}</td>
+        <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
+        <td class="brk">${bl}</td>
+        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
+        <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
+        <td class="num">${s.out?h2(s.hrs):'—'}</td>
+        <td class="num">${last?`<b>${h2(shift)}</b>`:''}</td>
+        <td class="num">${veryLast?`<b>${h2(tc.total)}</b>`:''}</td>
+      </tr>`;
+    });
+  });
+
+  const flags = tc.days.flatMap(d=>d.exceptions.map(x=>({ymd:d.ymd,x,ex:isExcused(empId,d.ymd,x)})));
+  const flagBlock = flags.length? `<div class="tc-flags">${flags.map(f=>{
+      const btn=me().role==='hr'?`<button class="excuse-btn" onclick="toggleExcuse('${empId}','${f.ymd}','${encodeURIComponent(f.x)}')">${f.ex?'undo':'override'}</button>`:'';
+      return `<span class="exc ${f.ex?'excused':''}"><i class="ti ti-alert-triangle-filled"></i> ${md(f.ymd)}: ${f.x}${f.ex?' <em>· excused</em>':''} ${btn}</span>`;
+    }).join('')}</div>`:'';
+
+  const histCount = DB.audit.filter(x=>x.emp===empId && x.weekKey===weekKey).length;
+  const showHist = SHOWHIST.has(approvalKey(empId,weekKey));
+  const canEdit = can('edit', empId);
+  const openReqs = DB.requests.filter(r=>r.emp===empId && r.weekKey===weekKey && r.status==='pending');
+  const actions = [
+    a.locked && me().role==='hr' ? `<button class="btn ghost sm" onclick="unlockCard('${empId}','${weekKey}')"><i class="ti ti-lock-open"></i> Unlock</button>` : '',
+    canEdit && !a.locked ? `<button class="btn ghost sm" onclick="openPunch('${empId}','${weekKey}',null)"><i class="ti ti-plus"></i> Add punch</button>` : '',
+    histCount ? `<button class="btn ghost sm" onclick="toggleHist('${empId}','${weekKey}')"><i class="ti ti-history"></i> History (${histCount})</button>` : ''
+  ].filter(Boolean).join('');
+  const statusPill = L => { const layer=LAYER_BY[L]; const done=!!a[layer]; return `<span class="pill ${done?'ok':'neutral'}">${L==='E'?'Employee':L==='M'?'Manager':'HR'} ${cnt(L)}/${ids.length}${done?' ✓':''}</span>`; };
+
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="margin:0"><i class="ti ti-id-badge-2"></i> ${e.name} — ${weekLabel(weekKey)}</h2>
+        <div class="hint">${TZ[e.tz]} · ${STATE_RULES[e.loc]?STATE_RULES[e.loc].label:e.loc} rules${a.locked?' · <span class="pill ok"><i class="ti ti-lock"></i> Locked</span>':''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}</div>
+        <div style="font-size:20px;font-weight:700">${h2(tc.total)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${statusPill('E')}${statusPill('M')}${statusPill('O')}</div>
+    ${actions?`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${actions}</div>`:''}
+    ${renderReqBanner(empId, weekKey, openReqs, false)}
+    ${showHist?renderHistory(empId,weekKey):''}
+    <div style="overflow-x:auto"><table class="tcard">
+      <thead><tr>
+        <th title="Alert"><i class="ti ti-bell"></i></th>
+        ${hdr('E','E')}${hdr('M','M')}${hdr('O','O')}
+        <th>Notes</th><th>Break</th><th>Time In</th><th>Time Out</th><th class="num">Hours</th><th class="num">Shift</th><th class="num">Week</th>
+      </tr></thead>
+      <tbody>${body||`<tr><td colspan="11" class="empty">No punches this week.</td></tr>`}</tbody>
+    </table></div>
+    <div class="hint" style="margin-top:8px">Click <b>E</b>, <b>M</b>, or <b>O</b> in the header to approve every row for that party; or check rows individually. Break codes: <b>u</b> = unpaid meal, <b>p</b> = paid break.</div>
+    ${flagBlock}
+  </div>`;
+}
+
+/* ---------- HOURS: employee list + period timecard ---------- */
+let HOURS=null;
+function ymdD(y){return new Date(y+'T00:00:00Z');}
+function ymdAdd(y,n){return new Date(ymdD(y).getTime()+n*86400000).toISOString().slice(0,10);}
+function sundayOf(y){return ymdAdd(y, -((ymdD(y).getUTCDay()+6)%7));} // Monday of the week (period/week start)
+function todayYmd(e){return partsInTz(new Date().toISOString(), e.tz).ymd;}
+
+function initHours(){
+  HOURS={empId:null, preset:'thispp', start:'', stop:'', sort:'dept', search:'', listOpen:false};
+  const list=sortedEmployees();
+  const withData=list.find(e=>DB.punches.some(p=>p.emp===e.id && weekKeyFor(p.ts,e)===currentWeekKey(e)));
+  const pick=withData||list[0]||me();
+  const t=todayYmd(pick); HOURS.empId=pick.id; HOURS.start=payPeriodStart(t); HOURS.stop=ymdAdd(HOURS.start,13);
+}
+function filterSortEmps(sort, search){
+  let list=DB.employees.filter(e=>e.role==='employee');
+  const q=(search||'').toLowerCase().trim();
+  if(q) list=list.filter(e=>e.name.toLowerCase().includes(q)||(e.empId||'').includes(q));
+  const last=n=>n.trim().split(/\s+/).slice(-1)[0];
+  const cmp={
+    dept:(a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name),
+    last:(a,b)=>last(a.name).localeCompare(last(b.name)),
+    first:(a,b)=>a.name.localeCompare(b.name),
+    id:(a,b)=>(a.empId||'').localeCompare(b.empId||'',undefined,{numeric:true}),
+    loc:(a,b)=>(a.loc||'').localeCompare(b.loc||'')||a.name.localeCompare(b.name)
+  };
+  return list.sort(cmp[sort]||cmp.first);
+}
+function scopeIds(){ return new Set(scopeEmployees().map(e=>e.id)); }
+function sortedEmployees(){ const ok=scopeIds(); return filterSortEmps(HOURS?.sort, HOURS?.search).filter(e=>ok.has(e.id)); }
+// shared left-hand employee list; handler names passed in as strings
+function empListPanel(cfg){
+  const ok=scopeIds(); const list=filterSortEmps(cfg.sort,cfg.search).filter(e=>ok.has(e.id));
+  const grouped=(cfg.sort==='dept'||cfg.sort==='loc');
+  const gk=e=>cfg.sort==='dept'?(e.dept||'—'):(e.loc||'—');
+  let rows=''; let lg=null;
+  list.forEach(e=>{
+    if(grouped&&gk(e)!==lg){lg=gk(e);rows+=`<div class="emp-group">${lg}</div>`;}
+    const on=e.id===cfg.activeId;
+    rows+=`<button class="emp-item ${on?'on':''}" onclick="${cfg.onSelect}('${e.id}')">
+      <i class="ti ti-user-circle"></i><div><b>${e.empId} · ${e.name}</b><span>${e.dept} · ${e.loc}</span></div></button>`;
+  });
+  return `<div class="emplist"><div class="emplist-head">
+      <label class="sortrow"><span>Sort by</span><select onchange="${cfg.onSort}(this.value)">
+        <option value="id" ${cfg.sort==='id'?'selected':''}>Employee ID</option>
+        <option value="dept" ${cfg.sort==='dept'?'selected':''}>Department</option>
+        <option value="last" ${cfg.sort==='last'?'selected':''}>Last name</option>
+        <option value="first" ${cfg.sort==='first'?'selected':''}>First name</option>
+        <option value="loc" ${cfg.sort==='loc'?'selected':''}>Location</option></select></label>
+      <input class="emp-search" placeholder="Search name or ID…" value="${(cfg.search||'').replace(/"/g,'&quot;')}" onchange="${cfg.onSearch}(this.value)" onkeydown="if(event.key==='Enter')${cfg.onSearch}(this.value)">
+      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
+    </div><div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div></div>`;
+}
+function hoursSelect(id){ HOURS.empId=id; HOURS.listOpen=false; render(); }
+function toggleHoursList(){ HOURS.listOpen=!HOURS.listOpen; render(); }
+function hoursSort(v){ HOURS.sort=v; render(); }
+function hoursSearch(v){ HOURS.search=v; render(); }
+function hoursPreset(v){
+  HOURS.preset=v; const e=emp(HOURS.empId)||me(); const t=todayYmd(e); const sun=sundayOf(t);
+  if(v==='thispp'){ HOURS.start=payPeriodStart(t); HOURS.stop=ymdAdd(HOURS.start,13); }
+  else if(v==='lastpp'){ HOURS.start=ymdAdd(payPeriodStart(t),-14); HOURS.stop=ymdAdd(HOURS.start,13); }
+  else if(v==='thisweek'){ HOURS.start=sun; HOURS.stop=ymdAdd(sun,6); }
+  else if(v==='lastweek'){ HOURS.start=ymdAdd(sun,-7); HOURS.stop=ymdAdd(sun,-1); }
+  else if(v==='thismonth'){ HOURS.start=t.slice(0,8)+'01'; const d=ymdD(HOURS.start); HOURS.stop=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).toISOString().slice(0,10); }
+  render();
+}
+function hoursDate(field,v){ HOURS[field]=v; HOURS.preset='custom'; render(); }
+function hoursNav(dir){
+  const list=sortedEmployees(); const i=list.findIndex(e=>e.id===HOURS.empId);
+  const ni=Math.min(list.length-1, Math.max(0, (i<0?0:i)+dir));
+  if(list[ni]){ HOURS.empId=list[ni].id; render(); }
+}
+function buildPeriod(empId, start, stop){
+  let reg=0,ot=0,dt=0,total=0; const weeks=[];
+  let cur=sundayOf(start);
+  while(cur<=stop){ const tc=buildTimecard(empId,cur); reg+=tc.reg;ot+=tc.ot;dt+=tc.dt;total+=tc.total; weeks.push(cur); cur=ymdAdd(cur,7); }
+  return {reg,ot,dt,total,weeks};
+}
+
+/* ---------- ATTENDANCE (occurrences + points), LEAVE, PAYROLL ---------- */
+function toMin(hm){ const [h,m]=hm.split(':').map(Number); return h*60+m; }
+function scheduleFor(empId, ymd){
+  const ov=DB.schedules.filter(s=>s.emp===empId && s.date===ymd);
+  if(ov.length) return ov;
+  const wd=ymdD(ymd).getUTCDay();
+  return DB.recurring.filter(r=>r.emp===empId && r.weekday===wd);
+}
+function schedBounds(segs){
+  if(!segs.length) return null;
+  return {start:segs.reduce((a,s)=>Math.min(a,toMin(s.start)),1e9), end:segs.reduce((a,s)=>Math.max(a,toMin(s.end)),0)};
+}
+function dayPunchBounds(empId, ymd){
+  const e=emp(empId);
+  const ps=DB.punches.filter(p=>p.emp===empId && partsInTz(p.ts,e.tz).ymd===ymd).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
+  const ins=ps.filter(p=>p.type==='in'), outs=ps.filter(p=>p.type==='out');
+  const toM=p=>{const q=partsInTz(p.ts,e.tz);return q.hh*60+q.mm;};
+  return {any:ps.length>0, firstIn:ins.length?toM(ins[0]):null, lastOut:outs.length?toM(outs[outs.length-1]):null};
+}
+function occExcuseKey(emp,ymd,code){return `${emp}|${ymd}|${code}`;}
+function isOccExcused(emp,ymd,code){return !!DB.occExcused[occExcuseKey(emp,ymd,code)];}
+function dayOccurrences(empId, ymd){
+  const segs=scheduleFor(empId,ymd); const b=schedBounds(segs); if(!b) return [];
+  if(DB.leave.some(l=>l.emp===empId && l.date===ymd)) return []; // approved leave = no points
+  const pb=dayPunchBounds(empId,ymd); const occ=[];
+  const push=code=>occ.push({code, points:OCC_TYPES[code].points, auto:true, excused:isOccExcused(empId,ymd,code)});
+  if(!pb.any){ push('UA'); return occ; }
+  if(pb.firstIn!=null){
+    if(pb.firstIn > b.start+CFG.lateMin) push('L');
+    else if(pb.firstIn < b.start-CFG.earlyMin) push('CIE');
+  }
+  if(pb.lastOut!=null && pb.lastOut < b.end-CFG.leaveMin) push('LE');
+  return occ;
+}
+function periodOccurrences(empId, start, stop){
+  const out=[]; let cur=start;
+  while(cur<=stop){
+    dayOccurrences(empId,cur).forEach(o=>out.push({...o, date:cur}));
+    DB.occurrences.filter(m=>m.emp===empId && m.date===cur).forEach(m=>out.push({code:m.code, points:OCC_TYPES[m.code].points, date:cur, auto:false, id:m.id, note:m.note, excused:isOccExcused(empId,cur,m.code)}));
+    cur=ymdAdd(cur,1);
+  }
+  return out;
+}
+function rollingPoints(empId){
+  const today=todayYmd(emp(empId)); const cutoff=ymdAdd(today,-365);
+  let pts=0;
+  const dates=new Set();
+  DB.punches.filter(p=>p.emp===empId).forEach(p=>dates.add(partsInTz(p.ts,emp(empId).tz).ymd));
+  DB.schedules.filter(s=>s.emp===empId).forEach(s=>dates.add(s.date));
+  dates.forEach(d=>{ if(d>=cutoff && d<=today) dayOccurrences(empId,d).forEach(o=>{ if(!o.excused) pts+=o.points; }); });
+  DB.occurrences.filter(m=>m.emp===empId && m.date>=cutoff && m.date<=today && !isOccExcused(empId,m.date,m.code)).forEach(m=>pts+=OCC_TYPES[m.code].points);
+  return Math.round(pts*100)/100;
+}
+function toggleOccExcuse(empId,ymd,code){
+  const k=occExcuseKey(empId,ymd,code); const wk=sundayOf(ymd);
+  if(DB.occExcused[k]){ delete DB.occExcused[k]; audit('excuse',empId,wk,null,null,null,me().name,`Occurrence reinstated: ${code}`); }
+  else { DB.occExcused[k]={by:me().name,at:new Date().toISOString()}; audit('excuse',empId,wk,null,null,null,me().name,`Occurrence excused (no points): ${code}`); }
+  saveStore(); render();
+}
+
+/* leave entry modal */
+let LEDIT=null;
+function openLeave(empId, date){ EDIT=null;REQ=null;SEDIT=null;OEDIT=null;
+  LEDIT={empId, date:date||todayYmd(emp(empId)), type:LEAVE_TYPES[0], hours:8, note:'', id:null}; render(); }
+function openLeaveEdit(l){ EDIT=null;REQ=null;SEDIT=null;OEDIT=null;
+  LEDIT={empId:l.emp, date:l.date, type:l.type, hours:l.hours, note:l.note||'', id:l.id}; render(); }
+function leSet(f,v){ LEDIT[f]=f==='hours'?+v:v; }
+function closeLeave(){ LEDIT=null; render(); }
+function saveLeave(){
+  if(!(LEDIT.hours>0)){ toast('Enter hours'); return; }
+  if(LEDIT.id) Object.assign(DB.leave.find(x=>x.id===LEDIT.id),{date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
+  else DB.leave.push({id:'lv'+Date.now(),emp:LEDIT.empId,date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
+  LEDIT=null; saveStore(); toast('Leave saved'); render();
+}
+function deleteLeave(){ if(LEDIT.id) DB.leave=DB.leave.filter(x=>x.id!==LEDIT.id); LEDIT=null; saveStore(); toast('Removed'); render(); }
+function leavePeriod(empId,start,stop){
+  const t={PTO:0,Sick:0,Holiday:0,Bereavement:0};
+  DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
+  return t;
+}
+// company holidays in range -> auto paid hours for everyone (working a holiday is NOT premium)
+function holidaysInRange(start,stop){ return DB.holidays.filter(h=>h.date>=start && h.date<=stop); }
+function holidayHours(empId,start,stop){
+  const auto=holidaysInRange(start,stop).reduce((s,h)=>s+(h.hours||CFG.holidayHours),0);
+  return leavePeriod(empId,start,stop).Holiday + auto;
+}
+// premium hours: auto meal-violation days (not excused) + manual premiums (rest breaks etc.)
+function mealPremiumDays(empId,start,stop){
+  const out=[]; let cur=start;
+  while(cur<=stop){ const wk=weekKeyFor(cur+'T12:00:00Z',emp(empId));
+    const tc=buildTimecard(empId,wk); const d=tc.days.find(x=>x.ymd===cur);
+    if(d && d.mealViol){ const flag=d.exceptions.find(x=>x.includes('premium'));
+      if(flag && !isExcused(empId,cur,flag)) out.push(cur); }
+    cur=ymdAdd(cur,1);
+  }
+  return out;
+}
+function premiumHours(empId,start,stop){
+  const auto=mealPremiumDays(empId,start,stop).length; // 1 hr each
+  const manual=DB.premiums.filter(p=>p.emp===empId && p.date>=start && p.date<=stop).reduce((s,p)=>s+p.hours,0);
+  return {auto, manual, total:auto+manual};
+}
+
+/* manual occurrence modal */
+let OEDIT=null;
+function openOcc(empId, date){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;PEDIT=null;
+  OEDIT={empId, date:date||todayYmd(emp(empId)), code:'CL', note:''}; render(); }
+function oeSet(f,v){ OEDIT[f]=v; }
+function closeOcc(){ OEDIT=null; render(); }
+function saveOcc(){
+  DB.occurrences.push({id:'oc'+Date.now(),emp:OEDIT.empId,date:OEDIT.date,code:OEDIT.code,note:OEDIT.note,by:me().name,at:new Date().toISOString()});
+  audit('excuse',OEDIT.empId,sundayOf(OEDIT.date),null,null,null,me().name,`Occurrence added: ${OEDIT.code}`);
+  OEDIT=null; saveStore(); toast('Occurrence recorded'); render();
+}
+function deleteOcc(id, empId, date){ DB.occurrences=DB.occurrences.filter(x=>x.id!==id); saveStore(); render(); }
+
+/* manual premium modal */
+let PEDIT=null;
+function openPremium(empId,date){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;
+  PEDIT={empId, date:date||todayYmd(emp(empId)), hours:1, reason:'Missed rest break'}; render(); }
+function peSet(f,v){ PEDIT[f]=f==='hours'?+v:v; }
+function closePremium(){ PEDIT=null; render(); }
+function savePremium(){
+  if(!(PEDIT.hours>0)){ toast('Enter hours'); return; }
+  DB.premiums.push({id:'pm'+Date.now(),emp:PEDIT.empId,date:PEDIT.date,hours:PEDIT.hours,reason:PEDIT.reason,by:me().name,at:new Date().toISOString()});
+  PEDIT=null; saveStore(); toast('Premium added'); render();
+}
+function deletePremium(id){ DB.premiums=DB.premiums.filter(x=>x.id!==id); saveStore(); render(); }
+
+/* payroll hand-off */
+let PAYVIEW=null;
+function buildPayrollRows(start,stop){
+  return DB.employees.filter(e=>e.role==='employee').map(e=>{
+    const w=buildPeriod(e.id,start,stop); const lv=leavePeriod(e.id,start,stop);
+    const pto=lv.PTO+lv.Bereavement, sick=lv.Sick, hol=holidayHours(e.id,start,stop);
+    const prem=premiumHours(e.id,start,stop).total;
+    const total=w.reg+w.ot+w.dt+prem+pto+sick+hol;
+    return {emp:e.id, name:e.name, empId:e.empId, rate:e.rate||0, reg:w.reg, ot1:w.ot, ot2:w.dt, prem, pto, sick, holiday:hol, total};
+  });
+}
+function batchForPeriod(start,stop){ return DB.payrollBatches.filter(b=>b.start===start && b.stop===stop).sort((a,b)=>new Date(b.at)-new Date(a.at))[0]; }
+function approveSendPayroll(){
+  PAYVIEW={start:HOURS.start, stop:HOURS.stop, step:'confirm', rows:buildPayrollRows(HOURS.start,HOURS.stop)}; render();
+}
+function confirmSendPayroll(){
+  const start=PAYVIEW.start, stop=PAYVIEW.stop; const now=new Date().toISOString(); const by=me().name;
+  DB.employees.filter(e=>e.role==='employee').forEach(e=>{
+    let cur=sundayOf(start);
+    while(cur<=stop){ approveAllSegs(e.id,cur); recomputeWeekApproval(e.id,cur); cur=ymdAdd(cur,7); }
+  });
+  const rows=buildPayrollRows(start,stop);
+  const prev=batchForPeriod(start,stop);
+  const version=(prev?prev.version||1:0)+1;
+  DB.payrollBatches.push({id:'pb'+Date.now(), start, stop, at:now, by, status:'sent', version, rows});
+  PAYVIEW={...PAYVIEW, step:'done', rows}; saveStore(); toast('Period approved & sent to Payroll'); render();
+}
+function reopenPeriod(start,stop){
+  const b=batchForPeriod(start,stop); if(b) b.status='reopened';
+  DB.employees.filter(e=>e.role==='employee').forEach(e=>{
+    let cur=sundayOf(start);
+    while(cur<=stop){ const a=DB.approvals[approvalKey(e.id,cur)]; if(a) a.locked=false; cur=ymdAdd(cur,7); }
+  });
+  audit('excuse','—',start,null,null,null,me().name,'Payroll period reopened for correction');
+  saveStore(); toast('Period reopened — timecards unlocked'); render();
+}
+function closePay(){ PAYVIEW=null; render(); }
+
+function renderLeaveModal(){
+  const host=document.getElementById('modal'); const e=emp(LEDIT.empId);
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${LEDIT.id?'Edit':'Add'} paid hours</b><div class="hint">${e.name}</div></div>
+    <button class="btn ghost sm" onclick="closeLeave()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="formgrid">
+        <div class="field"><label>Type</label><select onchange="leSet('type',this.value)">${LEAVE_TYPES.map(t=>`<option ${LEDIT.type===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Hours</label><input type="number" step="0.25" min="0" value="${LEDIT.hours}" onchange="leSet('hours',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Date</label><input type="date" value="${LEDIT.date}" onchange="leSet('date',this.value)"></div>
+      <div class="field" style="margin-top:14px"><label>Note (optional)</label><input value="${(LEDIT.note||'').replace(/"/g,'&quot;')}" oninput="LEDIT.note=this.value"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> Approved leave counts toward pay and waives attendance points for that day.</div>
+    </div>
+    <div class="modalfoot">${LEDIT.id?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deleteLeave()"><i class="ti ti-trash"></i> Remove</button>`:''}
+      <button class="btn ghost" onclick="closeLeave()">Cancel</button><button class="btn primary" onclick="saveLeave()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+function renderOccModal(){
+  const host=document.getElementById('modal'); const e=emp(OEDIT.empId);
+  const manual=Object.entries(OCC_TYPES).filter(([k,v])=>!v.auto);
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>Record occurrence</b><div class="hint">${e.name}</div></div>
+    <button class="btn ghost sm" onclick="closeOcc()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="field"><label>Type</label><select onchange="oeSet('code',this.value)">${manual.map(([k,v])=>`<option value="${k}" ${OEDIT.code===k?'selected':''}>${v.label} (${v.points} pt${v.points===1?'':'s'})</option>`).join('')}</select></div>
+      <div class="field" style="margin-top:14px"><label>Date</label><input type="date" value="${OEDIT.date}" onchange="oeSet('date',this.value)"></div>
+      <div class="field" style="margin-top:14px"><label>Note (optional)</label><input value="${(OEDIT.note||'').replace(/"/g,'&quot;')}" oninput="OEDIT.note=this.value"></div>
+      <div class="hint" style="margin-top:10px">Late, early-out, and no-show absences are detected automatically. Use this for call-in occurrences.</div>
+    </div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closeOcc()">Cancel</button><button class="btn primary" onclick="saveOcc()">Record</button></div></div>`;
+  host.classList.add('show');
+}
+function renderPremiumModal(){
+  const host=document.getElementById('modal'); const e=emp(PEDIT.empId);
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>Add premium hours</b><div class="hint">${e.name}</div></div>
+    <button class="btn ghost sm" onclick="closePremium()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="formgrid">
+        <div class="field"><label>Reason</label><select onchange="peSet('reason',this.value)">
+          <option ${PEDIT.reason==='Missed rest break'?'selected':''}>Missed rest break</option>
+          <option ${PEDIT.reason==='Missed meal (manual)'?'selected':''}>Missed meal (manual)</option>
+          <option ${PEDIT.reason==='Other'?'selected':''}>Other</option></select></div>
+        <div class="field"><label>Hours</label><input type="number" step="0.25" min="0" value="${PEDIT.hours}" onchange="peSet('hours',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Date</label><input type="date" value="${PEDIT.date}" onchange="peSet('date',this.value)"></div>
+      <div class="hint" style="margin-top:10px">Premiums are paid at the employee's regular rate. Auto meal premiums are already counted — use this for rest-break or manual premiums.</div>
+    </div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closePremium()">Cancel</button><button class="btn primary" onclick="savePremium()">Add</button></div></div>`;
+  host.classList.add('show');
+}
+
+function renderPayModal(){
+  const host=document.getElementById('modal'); const done=PAYVIEW.step==='done';
+  const rows=PAYVIEW.rows; const sum=k=>rows.reduce((s,r)=>s+r[k],0);
+  host.innerHTML=`<div class="modalcard" style="max-width:820px"><div class="modalhead">
+    <div><b>${done?'Sent to Payroll':'Approve period & send to Payroll'}</b><div class="hint">${weekLabel(PAYVIEW.start)} → ${weekLabel(ymdAdd(PAYVIEW.stop,-6))} · ${rows.length} employees</div></div>
+    <button class="btn ghost sm" onclick="closePay()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      ${done?`<div class="notewarn" style="background:var(--okbg);color:#166534"><i class="ti ti-check"></i> All timecards approved and locked. This batch is queued for the Payroll module, where you can adjust pay, add bonuses, and finalize.</div>`
+             :`<div class="notewarn"><i class="ti ti-info-circle"></i> This approves and locks every timecard in the period, then transfers these hours to Payroll.</div>`}
+      <table class="paytable"><thead><tr><th>ID</th><th>Employee</th><th class="num">Rate</th><th class="num">Reg</th><th class="num">OT1</th><th class="num">OT2</th><th class="num">Prem</th><th class="num">PTO</th><th class="num">Sick</th><th class="num">Hol</th><th class="num">Total</th></tr></thead><tbody>
+        ${rows.map(r=>`<tr><td>${r.empId}</td><td>${r.name}</td><td class="num">$${(r.rate||0).toFixed(2)}</td><td class="num">${h2(r.reg)}</td><td class="num">${h2(r.ot1)}</td><td class="num">${h2(r.ot2)}</td><td class="num">${r.prem?h2(r.prem):'—'}</td><td class="num">${h2(r.pto)}</td><td class="num">${h2(r.sick)}</td><td class="num">${h2(r.holiday)}</td><td class="num"><b>${h2(r.total)}</b></td></tr>`).join('')}
+      </tbody><tfoot><tr><td colspan="3"><b>Totals</b></td><td class="num">${h2(sum('reg'))}</td><td class="num">${h2(sum('ot1'))}</td><td class="num">${h2(sum('ot2'))}</td><td class="num">${h2(sum('prem'))}</td><td class="num">${h2(sum('pto'))}</td><td class="num">${h2(sum('sick'))}</td><td class="num">${h2(sum('holiday'))}</td><td class="num"><b>${h2(sum('total'))}</b></td></tr></tfoot></table>
+      <div class="hint" style="margin-top:8px">Prem = meal-premium hours (auto) + any manual rest-break premiums, paid at the regular rate.</div>
+    </div>
+    <div class="modalfoot">
+      <button class="btn ghost" onclick="closePay()">${done?'Close':'Cancel'}</button>
+      ${done?'':`<button class="btn primary" onclick="confirmSendPayroll()"><i class="ti ti-send"></i> Approve all & send</button>`}
+    </div></div>`;
+  host.classList.add('show');
+}
+
+// per-employee attendance + leave section for the Hours detail
+function attendanceSection(empId, start, stop){
+  const occ=periodOccurrences(empId,start,stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const roll=rollingPoints(empId); const tier=disciplineTier(roll);
+  const lv=DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const lt=leavePeriod(empId,start,stop);
+  const prem=premiumHours(empId,start,stop);
+  const premDays=mealPremiumDays(empId,start,stop);
+  const premList=DB.premiums.filter(p=>p.emp===empId && p.date>=start && p.date<=stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const holHrs=holidayHours(empId,start,stop);
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <h2 style="margin:0"><i class="ti ti-calendar-stats"></i> Attendance</h2>
+      <div style="text-align:right"><div style="font-size:12px;color:var(--muted)">Rolling 12-mo points</div>
+        <div><b style="font-size:20px">${roll}</b> <span class="pill ${tier.tone}">${tier.label}</span></div></div>
+    </div>
+    <div style="margin-top:12px">${occ.length? `<table class="wtable"><thead><tr><th>Date</th><th>Occurrence</th><th class="num">Pts</th><th></th></tr></thead><tbody>
+      ${occ.map(o=>{const dt=ymdD(o.date);const dl=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
+        return `<tr class="${o.excused?'occ-excused':''}"><td>${dl}</td>
+          <td>${OCC_TYPES[o.code].label} <span class="src">${o.code}</span>${o.auto?'':' <span class="src" style="background:var(--warnbg);color:var(--warn)">manual</span>'}${o.excused?' <em style="color:var(--ok)">· excused</em>':''}</td>
+          <td class="num">${o.excused?'0':o.points}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="excuse-btn" onclick="toggleOccExcuse('${empId}','${o.date}','${o.code}')">${o.excused?'reinstate':'excuse'}</button>
+            ${o.auto?'':`<button class="excuse-btn" onclick="deleteOcc('${o.id}')">delete</button>`}</td></tr>`;}).join('')}
+    </tbody></table>` : `<div class="empty">No attendance occurrences this period.</div>`}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn ghost sm" onclick="openOcc('${empId}')"><i class="ti ti-plus"></i> Record occurrence</button>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0;font-size:14px"><i class="ti ti-cash-banknote"></i> Premiums (paid at regular rate)</h2>
+      <div class="hint">Meal (auto) ${h2(prem.auto)} · Manual ${h2(prem.manual)} · <b>Total ${h2(prem.total)}</b></div>
+    </div>
+    <div class="hint" style="margin-top:6px">${premDays.length?`Auto meal premium on: ${premDays.map(d=>ymdD(d).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})).join(', ')}. Excuse the meal flag on a timecard to remove a false positive.`:'No auto meal premiums this period.'}</div>
+    ${premList.length?`<div style="margin-top:8px">${premList.map(p=>`<div class="listrow"><div><b>${h2(p.hours)} · ${p.reason}</b><div class="listsub">${ymdD(p.date).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})} · by ${p.by}</div></div><button class="excuse-btn" onclick="deletePremium('${p.id}')">delete</button></div>`).join('')}</div>`:''}
+    <button class="btn ghost sm" style="margin-top:10px" onclick="openPremium('${empId}')"><i class="ti ti-plus"></i> Add premium (rest break / manual)</button>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0;font-size:14px"><i class="ti ti-beach"></i> Paid hours (PTO / Sick / Holiday)</h2>
+      <div class="hint">PTO ${h2(lt.PTO+lt.Bereavement)} · Sick ${h2(lt.Sick)} · Holiday ${h2(holHrs)}</div>
+    </div>
+    <div class="hint" style="margin-top:6px">PTO/Sick balances are maintained in the HR Hub; hours entered here feed payroll.</div>
+    <div style="margin-top:10px">${lv.length? lv.map(l=>{const dt=ymdD(l.date);
+      return `<div class="listrow"><div><b>${l.type} · ${h2(l.hours)}</b><div class="listsub">${dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}${l.note?' · '+l.note:''}</div></div>
+        <button class="excuse-btn" onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>edit</button></div>`;}).join('')
+      : `<div class="empty">No paid-leave entries this period.</div>`}
+    </div>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="openLeave('${empId}')"><i class="ti ti-plus"></i> Add PTO / Sick / Holiday</button>
+  </div>`;
+}
+
+function viewHours(){
+  if(!HOURS) initHours();
+  const list=sortedEmployees();
+  const grouped=(HOURS.sort==='dept'||HOURS.sort==='loc');
+  const groupKey=e=>HOURS.sort==='dept'?(e.dept||'—'):(e.loc||'—');
+
+  // left employee list — with each employee's total for the selected period
+  let rows=''; let lastG=null;
+  list.forEach(e=>{
+    if(grouped && groupKey(e)!==lastG){ lastG=groupKey(e); rows+=`<div class="emp-group">${lastG}</div>`; }
+    const on=e.id===HOURS.empId;
+    const sub=`ID ${e.empId} · ${e.dept}`;
+    const pt=buildPeriod(e.id, HOURS.start, HOURS.stop).total;
+    rows+=`<button class="emp-item ${on?'on':''}" onclick="hoursSelect('${e.id}')">
+      <i class="ti ti-user-circle"></i><div class="ei-main"><b>${e.name}</b><span>${sub}</span></div>
+      <span class="ei-hrs">${pt?h2(pt):'—'}</span></button>`;
+  });
+
+  const listPanel=`<div class="emplist">
+    <div class="emplist-head">
+      <label class="sortrow"><span>Sort by</span>
+        <select onchange="hoursSort(this.value)">
+          <option value="dept" ${HOURS.sort==='dept'?'selected':''}>Department</option>
+          <option value="last" ${HOURS.sort==='last'?'selected':''}>Last name</option>
+          <option value="first" ${HOURS.sort==='first'?'selected':''}>First name</option>
+          <option value="id" ${HOURS.sort==='id'?'selected':''}>Employee ID</option>
+          <option value="loc" ${HOURS.sort==='loc'?'selected':''}>Location</option>
+        </select></label>
+      <input class="emp-search" placeholder="Search name or ID…" value="${(HOURS.search||'').replace(/"/g,'&quot;')}"
+             onchange="hoursSearch(this.value)" onkeydown="if(event.key==='Enter')hoursSearch(this.value)">
+      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
+    </div>
+    <div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div>
+  </div>`;
+
+  // right detail
+  let detail;
+  if(!HOURS.empId){ detail=`<div class="card"><button class="btn ghost sm" onclick="toggleHoursList()"><i class="ti ti-users"></i> ${HOURS.listOpen?'Hide list':'Employees'}</button><div class="empty">Select an employee.</div></div>`; }
+  else{
+    const e=emp(HOURS.empId); const pd=buildPeriod(e.id, HOURS.start, HOURS.stop);
+    const idx=list.findIndex(x=>x.id===e.id);
+    const totals=`<div class="totalsbar">
+      <div class="tcell"><span>Regular</span><b>${h2(pd.reg)}</b></div>
+      <div class="tcell"><span>OT1</span><b>${h2(pd.ot)}</b></div>
+      <div class="tcell"><span>OT2</span><b>${h2(pd.dt)}</b></div>
+      <div class="tcell total"><span>Total</span><b>${h2(pd.total)}</b></div>
+    </div>`;
+    detail=`
+    <div class="detail-head">
+      <button class="btn ghost sm" onclick="toggleHoursList()" title="Show/hide employee list"><i class="ti ti-users"></i> ${HOURS.listOpen?'Hide list':'Employees'} <span class="src">${list.length}</span></button>
+      <div class="detail-nav">
+        <button class="iconbtn" onclick="hoursNav(-1)" ${idx<=0?'disabled':''}><i class="ti ti-chevron-up"></i></button>
+        <button class="iconbtn" onclick="hoursNav(1)" ${idx>=list.length-1?'disabled':''}><i class="ti ti-chevron-down"></i></button>
+      </div>
+      <div class="detail-who"><b>${e.name}</b><span>ID ${e.empId} · ${e.dept} · ${e.loc} · ${TZ[e.tz]}</span></div>
+      <div style="flex:1"></div>
+      ${me().role==='hr'?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve period &amp; send to Payroll</button>`:''}
+    </div>
+    ${me().role==='hr'?(()=>{const b=batchForPeriod(HOURS.start,HOURS.stop); if(b&&b.status==='sent') return `<div class="reqbanner info"><div class="reqrow"><i class="ti ti-cash"></i><div><b>Period sent to Payroll</b><div class="reqmeta">${new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} by ${b.by}${b.version>1?` · v${b.version}`:''} — timecards are locked.</div></div><button class="btn ghost sm" onclick="reopenPeriod('${HOURS.start}','${HOURS.stop}')"><i class="ti ti-lock-open"></i> Reopen</button></div></div>`; return '';})():''}
+    <div class="periodbar">
+      <div class="field"><label>Period</label>
+        <select onchange="hoursPreset(this.value)">
+          <option value="thispp" ${HOURS.preset==='thispp'?'selected':''}>This pay period</option>
+          <option value="lastpp" ${HOURS.preset==='lastpp'?'selected':''}>Last pay period</option>
+          <option value="thisweek" ${HOURS.preset==='thisweek'?'selected':''}>This week</option>
+          <option value="lastweek" ${HOURS.preset==='lastweek'?'selected':''}>Last week</option>
+          <option value="thismonth" ${HOURS.preset==='thismonth'?'selected':''}>This month</option>
+          <option value="custom" ${HOURS.preset==='custom'?'selected':''}>Custom</option>
+        </select></div>
+      <div class="field"><label>Start</label><input type="date" value="${HOURS.start}" onchange="hoursDate('start',this.value)"></div>
+      <div class="field"><label>Stop</label><input type="date" value="${HOURS.stop}" onchange="hoursDate('stop',this.value)"></div>
+      <div style="flex:1"></div>
+      ${totals}
+    </div>
+    ${pd.weeks.map(wk=>renderTimecard(e.id, wk, me().role==='manager'?'manager':'hr')).join('')}
+    ${attendanceSection(e.id, HOURS.start, HOURS.stop)}`;
+  }
+
+  return `<div class="pagehead"><div><h1>Hours</h1><p>Select an employee to review and finalize their timecard.</p></div></div>
+    <div class="hours-layout ${HOURS.listOpen?'':'collapsed'}">${HOURS.listOpen?listPanel:''}<div class="hours-detail">${detail}</div></div>`;
+}
+
+/* ---------- SCHEDULES: weekly grid (overrides + recurring) ---------- */
+let SCHED=null, SEDIT=null;
+const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function segMin(s,e){const[a,b]=s.split(':').map(Number);const[c,d]=e.split(':').map(Number);return (c*60+d)-(a*60+b);}
+function initSched(){
+  const ok=scopeIds(); const list=filterSortEmps('id','').filter(e=>ok.has(e.id));
+  const pick=list.find(e=>DB.schedules.some(s=>s.emp===e.id))||list[0]||me();
+  const sun=sundayOf(todayYmd(pick));
+  SCHED={empId:pick.id, sort:'id', search:'', tab:'overrides', weekends:false, preset:'two', start:sun, stop:ymdAdd(sun,13)};
+}
+function schedSelect(id){ SCHED.empId=id; render(); }
+function schedSort(v){ SCHED.sort=v; render(); }
+function schedSearch(v){ SCHED.search=v; render(); }
+function schedTab(v){ SCHED.tab=v; render(); }
+function schedWeekends(){ SCHED.weekends=!SCHED.weekends; render(); }
+function schedPreset(v){
+  SCHED.preset=v; const sun=sundayOf(todayYmd(emp(SCHED.empId)||me()));
+  if(v==='thisweek'){ SCHED.start=sun; SCHED.stop=ymdAdd(sun,6); }
+  else if(v==='two'){ SCHED.start=sun; SCHED.stop=ymdAdd(sun,13); }
+  else if(v==='month'){ const t=todayYmd(emp(SCHED.empId)||me()); SCHED.start=t.slice(0,8)+'01'; const d=ymdD(SCHED.start); SCHED.stop=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).toISOString().slice(0,10); }
+  render();
+}
+function schedDate(f,v){ SCHED[f]=v; SCHED.preset='custom'; render(); }
+function schedNav(dir){ const ok=scopeIds(); const list=filterSortEmps(SCHED.sort,SCHED.search).filter(e=>ok.has(e.id)); const i=list.findIndex(e=>e.id===SCHED.empId);
+  const ni=Math.min(list.length-1,Math.max(0,(i<0?0:i)+dir)); if(list[ni]){SCHED.empId=list[ni].id;render();} }
+
+function daysOfWeek(mon, weekends){
+  const d=[0,1,2,3,4].map(i=>ymdAdd(mon,i));        // Mon–Fri
+  if(weekends){ d.push(ymdAdd(mon,5)); d.push(ymdAdd(mon,6)); } // Sat, Sun
+  return d;
+}
+function dayLabel(ymd){ const dt=ymdD(ymd); return `${String(dt.getUTCMonth()+1).padStart(2,'0')}/${String(dt.getUTCDate()).padStart(2,'0')} (${WD[dt.getUTCDay()]})`; }
+function segChip(seg, mode){
+  const mins=segMin(seg.start,seg.end);
+  return `<button class="seg-chip" onclick='openSchedEdit(${JSON.stringify(seg).replace(/'/g,"&#39;")},"${mode}")'>
+    <b>${fmt12(seg.start)}–${fmt12(seg.end)}</b><span>${seg.jobCode||''} · ${h2(mins/60)}</span></button>`;
+}
+
+function openSched(empId, ctx){ EDIT=null;REQ=null;
+  SEDIT={empId, mode:ctx.mode, date:ctx.date||null, weekday:(ctx.weekday??null), start:'08:00', end:'16:30', jobCode:JOBCODES[0], note:'', id:null}; render(); }
+function openSchedEdit(seg, mode){ EDIT=null;REQ=null;
+  SEDIT={empId:seg.emp, mode, date:seg.date||null, weekday:(seg.weekday??null), start:seg.start, end:seg.end, jobCode:seg.jobCode||JOBCODES[0], note:seg.note||'', id:seg.id}; render(); }
+function seSet(f,v){ SEDIT[f]=v; }
+function closeSched(){ SEDIT=null; render(); }
+function saveSched(){
+  if(SEDIT.end<=SEDIT.start){ toast('End time must be after start'); return; }
+  if(SEDIT.mode==='overrides'){
+    if(SEDIT.id){ Object.assign(DB.schedules.find(x=>x.id===SEDIT.id),{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note}); }
+    else DB.schedules.push({id:'sc'+Date.now(),emp:SEDIT.empId,date:SEDIT.date,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note});
+  } else {
+    if(SEDIT.id){ Object.assign(DB.recurring.find(x=>x.id===SEDIT.id),{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode}); }
+    else DB.recurring.push({id:'rc'+Date.now(),emp:SEDIT.empId,weekday:SEDIT.weekday,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode});
+  }
+  SEDIT=null; saveStore(); toast('Schedule saved'); render();
+}
+function deleteSched(){
+  if(SEDIT.id){ if(SEDIT.mode==='overrides') DB.schedules=DB.schedules.filter(x=>x.id!==SEDIT.id); else DB.recurring=DB.recurring.filter(x=>x.id!==SEDIT.id); }
+  SEDIT=null; saveStore(); toast('Removed'); render();
+}
+
+function viewSchedules(){
+  if(!SCHED) initSched();
+  const listPanel=empListPanel({sort:SCHED.sort,search:SCHED.search,activeId:SCHED.empId,onSelect:'schedSelect',onSort:'schedSort',onSearch:'schedSearch'});
+  let detail;
+  if(!SCHED.empId){ detail=`<div class="card"><div class="empty">Select an employee.</div></div>`; }
+  else{
+    const e=emp(SCHED.empId); const ok=scopeIds(); const list=filterSortEmps(SCHED.sort,SCHED.search).filter(e=>ok.has(e.id)); const idx=list.findIndex(x=>x.id===e.id);
+    const cols = SCHED.weekends?7:5;
+
+    let body;
+    if(SCHED.tab==='recurring'){
+      const wds = SCHED.weekends?[1,2,3,4,5,6,0]:[1,2,3,4,5];
+      body=`<div class="sched-note">Weekly template — applies to every week until overridden.</div>
+      <div class="week-grid" style="grid-template-columns:repeat(${cols},1fr)">
+        ${wds.map(wd=>{
+          const segs=DB.recurring.filter(r=>r.emp===e.id && r.weekday===wd);
+          const tot=segs.reduce((s,x)=>s+segMin(x.start,x.end),0);
+          return `<div class="day-cell"><div class="day-head"><span>${WD[wd]}</span><b>${h2(tot/60)}</b></div>
+            <div class="day-body">${segs.map(s=>segChip(s,'recurring')).join('')}
+            <button class="add-seg" onclick="openSched('${e.id}',{mode:'recurring',weekday:${wd}})"><i class="ti ti-plus"></i> Add</button></div></div>`;
+        }).join('')}
+      </div>`;
+    } else {
+      // overrides: one grid per week in range
+      let cur=sundayOf(SCHED.start); const blocks=[];
+      while(cur<=SCHED.stop){
+        const days=daysOfWeek(cur,SCHED.weekends);
+        const label=`${dayLabel(days[0]).slice(0,5)} - ${dayLabel(days[days.length-1]).slice(0,5)}`;
+        blocks.push(`<div class="week-label">${label}</div>
+          <div class="week-grid" style="grid-template-columns:repeat(${cols},1fr)">
+            ${days.map(ymd=>{
+              const segs=DB.schedules.filter(s=>s.emp===e.id && s.date===ymd);
+              const tot=segs.reduce((s,x)=>s+segMin(x.start,x.end),0);
+              return `<div class="day-cell"><div class="day-head"><span>${dayLabel(ymd)}</span><b>${h2(tot/60)}</b></div>
+                <div class="day-body">${segs.map(s=>segChip(s,'overrides')).join('')}
+                <button class="add-seg" onclick="openSched('${e.id}',{mode:'overrides',date:'${ymd}'})"><i class="ti ti-plus"></i> Add</button></div></div>`;
+            }).join('')}
+          </div>`);
+        cur=ymdAdd(cur,7);
+      }
+      body=blocks.join('');
+    }
+
+    detail=`
+    <div class="detail-head">
+      <div class="detail-nav">
+        <button class="iconbtn" onclick="schedNav(-1)" ${idx<=0?'disabled':''}><i class="ti ti-chevron-up"></i></button>
+        <button class="iconbtn" onclick="schedNav(1)" ${idx>=list.length-1?'disabled':''}><i class="ti ti-chevron-down"></i></button>
+      </div>
+      <div class="detail-who"><b>${e.name}</b><span>ID ${e.empId} · ${e.dept} · ${e.loc}</span></div>
+    </div>
+    <div class="subtabs">
+      <button class="subtab ${SCHED.tab==='overrides'?'on':''}" onclick="schedTab('overrides')">Overrides</button>
+      <button class="subtab ${SCHED.tab==='recurring'?'on':''}" onclick="schedTab('recurring')">Recurring</button>
+    </div>
+    ${SCHED.tab==='overrides'?`<div class="periodbar">
+      <div class="field"><label>Period</label>
+        <select onchange="schedPreset(this.value)">
+          <option value="thisweek" ${SCHED.preset==='thisweek'?'selected':''}>This week</option>
+          <option value="two" ${SCHED.preset==='two'?'selected':''}>2 weeks</option>
+          <option value="month" ${SCHED.preset==='month'?'selected':''}>This month</option>
+          <option value="custom" ${SCHED.preset==='custom'?'selected':''}>Custom</option>
+        </select></div>
+      <div class="field"><label>Start</label><input type="date" value="${SCHED.start}" onchange="schedDate('start',this.value)"></div>
+      <div class="field"><label>Stop</label><input type="date" value="${SCHED.stop}" onchange="schedDate('stop',this.value)"></div>
+      <div style="flex:1"></div>
+      <label class="wk-toggle"><input type="checkbox" ${SCHED.weekends?'checked':''} onchange="schedWeekends()"> Display weekends</label>
+    </div>`:`<div class="periodbar"><div style="flex:1"></div>
+      <label class="wk-toggle"><input type="checkbox" ${SCHED.weekends?'checked':''} onchange="schedWeekends()"> Display weekends</label></div>`}
+    ${body}`;
+  }
+  return `<div class="pagehead"><div><h1>Employee Schedules</h1><p>Assign shift segments per day, or set a recurring weekly template.</p></div></div>
+    <div class="hours-layout">${listPanel}<div class="hours-detail">${detail}</div></div>`;
+}
+
+function renderSchedModal(){
+  const host=document.getElementById('modal'); const e=emp(SEDIT.empId);
+  const ctxLabel = SEDIT.mode==='overrides' ? dayLabel(SEDIT.date) : `${WD[SEDIT.weekday]} (every week)`;
+  host.innerHTML=`<div class="modalcard">
+    <div class="modalhead"><div><b>${SEDIT.id?'Edit':'Add'} ${SEDIT.mode==='recurring'?'recurring ':''}shift</b>
+      <div class="hint">${e.name} · ${ctxLabel}</div></div>
+      <button class="btn ghost sm" onclick="closeSched()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="formgrid">
+        <div class="field"><label>Start</label><input type="time" value="${SEDIT.start}" onchange="seSet('start',this.value)"></div>
+        <div class="field"><label>End</label><input type="time" value="${SEDIT.end}" onchange="seSet('end',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Job code</label>
+        <select onchange="seSet('jobCode',this.value)">${JOBCODES.map(j=>`<option ${SEDIT.jobCode===j?'selected':''}>${j}</option>`).join('')}</select></div>
+      ${SEDIT.mode==='overrides'?`<div class="field" style="margin-top:14px"><label>Note (optional)</label>
+        <input value="${(SEDIT.note||'').replace(/"/g,'&quot;')}" oninput="SEDIT.note=this.value"></div>`:''}
+    </div>
+    <div class="modalfoot">
+      ${SEDIT.id?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deleteSched()"><i class="ti ti-trash"></i> Remove</button>`:''}
+      <button class="btn ghost" onclick="closeSched()">Cancel</button>
+      <button class="btn primary" onclick="saveSched()"><i class="ti ti-device-floppy"></i> Save</button>
+    </div>
+  </div>`;
+  host.classList.add('show');
+}
+
+/* ---------- REPORTS: builder, CSV/PDF export, saved configs ---------- */
+const REPORT_FIELDS={
+  empId:{label:'ID'}, name:{label:'Employee'}, dept:{label:'Department'}, state:{label:'State'},
+  manager:{label:'Manager'}, rate:{label:'Rate',num:true,money:true},
+  reg:{label:'Reg',num:true}, ot1:{label:'OT1',num:true}, ot2:{label:'OT2',num:true}, prem:{label:'Prem',num:true},
+  pto:{label:'PTO',num:true}, sick:{label:'Sick',num:true}, holiday:{label:'Holiday',num:true}, total:{label:'Total',num:true},
+  points:{label:'Points',num:true}, tier:{label:'Standing'}
+};
+const REPORT_PRESETS={
+  hours:{label:'Period Hours', cols:['empId','name','dept','reg','ot1','ot2','prem','pto','sick','holiday','total'], group:''},
+  dept:{label:'Department Summary', cols:['dept','reg','ot1','ot2','prem','pto','sick','holiday','total'], group:'dept'},
+  attendance:{label:'Attendance & Points', cols:['empId','name','dept','points','tier'], group:''}
+};
+let REPORT=null;
+function initReport(){
+  const t=todayYmd(me()); const s=payPeriodStart(t);
+  REPORT={cols:REPORT_PRESETS.hours.cols.slice(), group:'', start:s, stop:ymdAdd(s,13), preset:'thispp', filterDept:'', saveName:'',
+          tcEmp:(DB.employees.find(e=>e.role==='employee')||{}).id};
+}
+function recordFor(e,start,stop){
+  const w=buildPeriod(e.id,start,stop); const lv=leavePeriod(e.id,start,stop);
+  const prem=premiumHours(e.id,start,stop).total; const hol=holidayHours(e.id,start,stop);
+  const pto=lv.PTO+lv.Bereavement, sick=lv.Sick; const pts=rollingPoints(e.id);
+  return {empId:e.empId,name:e.name,dept:e.dept,state:e.loc,manager:emp(e.mgr)?emp(e.mgr).name:'',rate:e.rate||0,
+    reg:w.reg,ot1:w.ot,ot2:w.dt,prem,pto,sick,holiday:hol,total:w.reg+w.ot+w.dt+prem+pto+sick+hol,
+    points:pts,tier:disciplineTier(pts).label};
+}
+function reportRecords(){
+  const ok=scopeIds();
+  return DB.employees.filter(e=>e.role==='employee' && ok.has(e.id) && (!REPORT.filterDept||e.dept===REPORT.filterDept))
+    .sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name))
+    .map(e=>recordFor(e,REPORT.start,REPORT.stop));
+}
+function reportGrouped(){
+  const recs=reportRecords();
+  if(!REPORT.group) return [{key:null, rows:recs}];
+  const g={}; recs.forEach(r=>{ const k=r[REPORT.group]||'—'; (g[k]=g[k]||[]).push(r); });
+  return Object.keys(g).sort().map(k=>({key:k, rows:g[k]}));
+}
+function fmtCell(c,v){ const f=REPORT_FIELDS[c]; if(f.num) return (f.money?'$':'')+(+v||0).toFixed(2); return v??''; }
+function subtotal(rows,c){ return rows.reduce((s,r)=>s+(+r[c]||0),0); }
+
+function reportPreset(k){ const p=REPORT_PRESETS[k]; REPORT.cols=p.cols.slice(); REPORT.group=p.group; render(); }
+function reportToggleCol(c){ REPORT.cols=REPORT.cols.includes(c)?REPORT.cols.filter(x=>x!==c):[...REPORT.cols,c]; render(); }
+function reportGroupBy(v){ REPORT.group=v; render(); }
+function reportFilter(v){ REPORT.filterDept=v; render(); }
+function reportRange(v){ REPORT.preset=v; const t=todayYmd(me()); const sun=sundayOf(t);
+  if(v==='thispp'){ REPORT.start=payPeriodStart(t); REPORT.stop=ymdAdd(REPORT.start,13); }
+  else if(v==='lastpp'){ REPORT.start=ymdAdd(payPeriodStart(t),-14); REPORT.stop=ymdAdd(REPORT.start,13); }
+  else if(v==='thisweek'){ REPORT.start=sun; REPORT.stop=ymdAdd(sun,6); }
+  else if(v==='thismonth'){ REPORT.start=t.slice(0,8)+'01'; const d=ymdD(REPORT.start); REPORT.stop=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,0)).toISOString().slice(0,10); }
+  else if(v==='ytd'){ REPORT.start=t.slice(0,4)+'-01-01'; REPORT.stop=t; }
+  render();
+}
+function reportDate(f,v){ REPORT[f]=v; REPORT.preset='custom'; render(); }
+
+function download(text,fname,mime){ const b=new Blob([text],{type:mime}); const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download=fname; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000); }
+function reportName(){ return `WSDisplay_report_${REPORT.start}_${REPORT.stop}`; }
+function exportReportCSV(){
+  const cols=REPORT.cols; const groups=reportGrouped();
+  const lines=[cols.map(c=>REPORT_FIELDS[c].label).join(',')];
+  const cell=(c,v)=>{ const f=REPORT_FIELDS[c]; if(f.num) return (+v||0).toFixed(2); return `"${(v??'').toString().replace(/"/g,'""')}"`; };
+  groups.forEach(g=>{ g.rows.forEach(r=>lines.push(cols.map(c=>cell(c,r[c])).join(','))); });
+  download(lines.join('\n'), reportName()+'.csv','text/csv');
+}
+function exportReportPDF(){
+  if(!window.jspdf){ toast('PDF library still loading — try again'); return; }
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'});
+  const cols=REPORT.cols; const head=[cols.map(c=>REPORT_FIELDS[c].label)]; const body=[];
+  reportGrouped().forEach(g=>{
+    if(g.key!==null) body.push([{content:g.key,colSpan:cols.length,styles:{fontStyle:'bold',fillColor:[238,242,255]}}]);
+    g.rows.forEach(r=>body.push(cols.map(c=>fmtCell(c,r[c]))));
+    if(g.key!==null) body.push(cols.map((c,i)=> i===0?'Subtotal':(REPORT_FIELDS[c].num?fmtCell(c,subtotal(g.rows,c)):'')));
+  });
+  doc.setFontSize(13); doc.text('WS Display — Timekeeping Report',14,14);
+  doc.setFontSize(9); doc.text(`${REPORT.start} to ${REPORT.stop}${REPORT.filterDept?' · '+REPORT.filterDept:''}`,14,20);
+  doc.autoTable({head,body,startY:24,styles:{fontSize:8},headStyles:{fillColor:[15,30,61]}});
+  doc.save(reportName()+'.pdf');
+}
+function exportTimecard(empId,fmt){
+  const e=emp(empId); const pd=buildPeriod(empId,REPORT.start,REPORT.stop); const rows=[];
+  pd.weeks.forEach(wk=>buildTimecard(empId,wk).days.forEach(d=>{
+    const io=d.punches.map(p=>fmtTime(p.ts,e)+' '+labelType(p.type)).join(', ');
+    rows.push([d.ymd, io, d.hrs.toFixed(2), d.exceptions.join('; ')]);
+  }));
+  if(fmt==='csv'){
+    const lines=[['Date','Punches','Hours','Flags'].join(',')];
+    rows.forEach(r=>lines.push(r.map(x=>`"${(x||'').toString().replace(/"/g,'""')}"`).join(',')));
+    lines.push(''); lines.push(`"Reg",${pd.reg.toFixed(2)}`,`"OT1",${pd.ot.toFixed(2)}`,`"OT2",${pd.dt.toFixed(2)}`,`"Total",${pd.total.toFixed(2)}`);
+    download(lines.join('\n'),`timecard_${e.empId}_${REPORT.start}.csv`,'text/csv'); return;
+  }
+  if(!window.jspdf){ toast('PDF library still loading — try again'); return; }
+  const {jsPDF}=window.jspdf; const doc=new jsPDF();
+  doc.setFontSize(14); doc.text('WS Display — Timecard',14,16);
+  doc.setFontSize(10); doc.text(`${e.name}  (ID ${e.empId})  ·  ${e.dept}  ·  ${e.loc}`,14,23);
+  doc.text(`Period ${REPORT.start} – ${REPORT.stop}`,14,29);
+  doc.autoTable({head:[['Date','Punches','Hours','Flags']],body:rows,startY:34,styles:{fontSize:8},headStyles:{fillColor:[15,30,61]}});
+  const y=(doc.lastAutoTable?doc.lastAutoTable.finalY:40)+8;
+  doc.setFontSize(10); doc.text(`Reg ${pd.reg.toFixed(2)}    OT1 ${pd.ot.toFixed(2)}    OT2 ${pd.dt.toFixed(2)}    Total ${pd.total.toFixed(2)}`,14,y);
+  doc.save(`timecard_${e.empId}_${REPORT.start}.pdf`);
+}
+function saveReportConfig(){
+  if(!REPORT.saveName.trim()){ toast('Name the report'); return; }
+  DB.reportConfigs.push({id:'rc'+Date.now(),name:REPORT.saveName.trim(),cols:REPORT.cols.slice(),group:REPORT.group,filterDept:REPORT.filterDept});
+  REPORT.saveName=''; saveStore(); toast('Report saved'); render();
+}
+function loadReportConfig(id){ const c=DB.reportConfigs.find(x=>x.id===id); if(c){ REPORT.cols=c.cols.slice(); REPORT.group=c.group; REPORT.filterDept=c.filterDept; render(); } }
+function deleteReportConfig(id){ DB.reportConfigs=DB.reportConfigs.filter(x=>x.id!==id); saveStore(); render(); }
+
+function viewReports(){
+  if(!REPORT) initReport();
+  const depts=[...new Set(DB.employees.filter(e=>e.role==='employee').map(e=>e.dept))].sort();
+  const groups=reportGrouped(); const cols=REPORT.cols;
+  const table=`<table class="rpt"><thead><tr>${cols.map(c=>`<th class="${REPORT_FIELDS[c].num?'num':''}">${REPORT_FIELDS[c].label}</th>`).join('')}</tr></thead><tbody>
+    ${groups.map(g=>`
+      ${g.key!==null?`<tr class="grp"><td colspan="${cols.length}">${g.key}</td></tr>`:''}
+      ${g.rows.map(r=>`<tr>${cols.map(c=>`<td class="${REPORT_FIELDS[c].num?'num':''}">${fmtCell(c,r[c])}</td>`).join('')}</tr>`).join('')}
+      ${g.key!==null?`<tr class="sub">${cols.map((c,i)=>`<td class="${REPORT_FIELDS[c].num?'num':''}">${i===0?'Subtotal':(REPORT_FIELDS[c].num?fmtCell(c,subtotal(g.rows,c)):'')}</td>`).join('')}</tr>`:''}
+    `).join('')}
+    </tbody>${!REPORT.group?`<tfoot><tr>${cols.map((c,i)=>`<td class="${REPORT_FIELDS[c].num?'num':''}">${i===0?'Total':(REPORT_FIELDS[c].num?fmtCell(c,subtotal(reportRecords(),c)):'')}</td>`).join('')}</tr></tfoot>`:''}</table>`;
+
+  return `<div class="pagehead"><div><h1>Reports</h1><p>Build, save, and export CSV or PDF from your timekeeping data.</p></div></div>
+  <div class="card">
+    <div class="rpt-bar">
+      <div class="field"><label>Period</label><select onchange="reportRange(this.value)">
+        <option value="thispp" ${REPORT.preset==='thispp'?'selected':''}>This pay period</option>
+        <option value="lastpp" ${REPORT.preset==='lastpp'?'selected':''}>Last pay period</option>
+        <option value="thisweek" ${REPORT.preset==='thisweek'?'selected':''}>This week</option>
+        <option value="thismonth" ${REPORT.preset==='thismonth'?'selected':''}>This month</option>
+        <option value="ytd" ${REPORT.preset==='ytd'?'selected':''}>Year to date</option>
+        <option value="custom" ${REPORT.preset==='custom'?'selected':''}>Custom</option></select></div>
+      <div class="field"><label>Start</label><input type="date" value="${REPORT.start}" onchange="reportDate('start',this.value)"></div>
+      <div class="field"><label>Stop</label><input type="date" value="${REPORT.stop}" onchange="reportDate('stop',this.value)"></div>
+      <div class="field"><label>Department</label><select onchange="reportFilter(this.value)">
+        <option value="">All</option>${depts.map(d=>`<option ${REPORT.filterDept===d?'selected':''}>${d}</option>`).join('')}</select></div>
+      <div class="field"><label>Group by</label><select onchange="reportGroupBy(this.value)">
+        <option value="" ${REPORT.group===''?'selected':''}>None</option>
+        <option value="dept" ${REPORT.group==='dept'?'selected':''}>Department</option>
+        <option value="state" ${REPORT.group==='state'?'selected':''}>State</option>
+        <option value="manager" ${REPORT.group==='manager'?'selected':''}>Manager</option></select></div>
+    </div>
+    <div class="rpt-presets">Presets:
+      ${Object.entries(REPORT_PRESETS).map(([k,p])=>`<button class="btn ghost sm" onclick="reportPreset('${k}')">${p.label}</button>`).join('')}
+    </div>
+    <div class="rpt-cols">Columns:
+      ${Object.entries(REPORT_FIELDS).map(([c,f])=>`<button class="colchip ${REPORT.cols.includes(c)?'on':''}" onclick="reportToggleCol('${c}')">${f.label}</button>`).join('')}
+    </div>
+    <div class="rpt-actions">
+      <button class="btn primary sm" onclick="exportReportCSV()"><i class="ti ti-file-spreadsheet"></i> Export CSV</button>
+      <button class="btn primary sm" onclick="exportReportPDF()"><i class="ti ti-file-type-pdf"></i> Export PDF</button>
+      <div style="flex:1"></div>
+      <input class="emp-search" style="max-width:220px" placeholder="Save this report as…" value="${(REPORT.saveName||'').replace(/"/g,'&quot;')}" onchange="REPORT.saveName=this.value" onkeydown="if(event.key==='Enter'){REPORT.saveName=this.value;saveReportConfig();}">
+      <button class="btn ghost sm" onclick="saveReportConfig()"><i class="ti ti-device-floppy"></i> Save</button>
+    </div>
+    ${DB.reportConfigs.length?`<div class="rpt-saved">Saved: ${DB.reportConfigs.map(c=>`<span class="savedchip"><button onclick="loadReportConfig('${c.id}')">${c.name}</button><button class="x" onclick="deleteReportConfig('${c.id}')">×</button></span>`).join('')}</div>`:''}
+    <div style="overflow-x:auto;margin-top:14px">${cols.length?table:'<div class="empty">Pick at least one column.</div>'}</div>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-file-download"></i> Employee timecard export</h2>
+    <div class="rpt-bar">
+      <div class="field"><label>Employee</label><select onchange="REPORT.tcEmp=this.value">
+        ${DB.employees.filter(e=>e.role==='employee').sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.id}" ${REPORT.tcEmp===e.id?'selected':''}>${e.empId} · ${e.name}</option>`).join('')}</select></div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <button class="btn ghost sm" onclick="exportTimecard(REPORT.tcEmp,'pdf')"><i class="ti ti-file-type-pdf"></i> Timecard PDF</button>
+        <button class="btn ghost sm" onclick="exportTimecard(REPORT.tcEmp,'csv')"><i class="ti ti-file-spreadsheet"></i> Timecard CSV</button>
+      </div>
+    </div>
+    <div class="hint">Uses the period selected above. Includes daily punches, hours, and flags.</div>
+  </div>`;
+}
+
+/* ---------- CONFIGURATION: pay period, thresholds, holidays ---------- */
+function cfgSet(f,v){ CFG[f]=(f==='payAnchor')?v:(+v||0); saveStore(); if(HOURS&&HOURS.preset&&HOURS.preset.includes('pp')) hoursPreset(HOURS.preset); toast('Saved'); render(); }
+let HEDIT=null;
+function openHoliday(id){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;
+  const h=id?DB.holidays.find(x=>x.id===id):null;
+  HEDIT=h?{...h}:{id:null, date:todayYmd(me()), name:'', hours:CFG.holidayHours}; render(); }
+function heSet(f,v){ HEDIT[f]=f==='hours'?+v:v; }
+function closeHoliday(){ HEDIT=null; render(); }
+function saveHoliday(){
+  if(!HEDIT.name.trim()){ toast('Enter a name'); return; }
+  if(HEDIT.id) Object.assign(DB.holidays.find(x=>x.id===HEDIT.id),{date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours});
+  else DB.holidays.push({id:'hol'+Date.now(),date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours});
+  HEDIT=null; saveStore(); toast('Holiday saved'); render();
+}
+function deleteHoliday(id){ DB.holidays=DB.holidays.filter(x=>x.id!==id); saveStore(); render(); }
+function renderHolidayModal(){
+  const host=document.getElementById('modal');
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${HEDIT.id?'Edit':'Add'} holiday</b></div>
+    <button class="btn ghost sm" onclick="closeHoliday()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="field"><label>Name</label><input value="${(HEDIT.name||'').replace(/"/g,'&quot;')}" oninput="HEDIT.name=this.value" placeholder="e.g. Independence Day"></div>
+      <div class="formgrid" style="margin-top:14px">
+        <div class="field"><label>Date</label><input type="date" value="${HEDIT.date}" onchange="heSet('date',this.value)"></div>
+        <div class="field"><label>Paid hours</label><input type="number" step="0.5" min="0" value="${HEDIT.hours}" onchange="heSet('hours',this.value)"></div>
+      </div>
+      <div class="hint" style="margin-top:10px">Every employee receives these Holiday hours. Working the holiday is paid at the regular rate (no premium).</div>
+    </div>
+    <div class="modalfoot">${HEDIT.id?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deleteHoliday('${HEDIT.id}');closeHoliday()"><i class="ti ti-trash"></i> Remove</button>`:''}
+      <button class="btn ghost" onclick="closeHoliday()">Cancel</button><button class="btn primary" onclick="saveHoliday()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+function viewConfig(){
+  const t=todayYmd(me()); const pp=payPeriodStart(t);
+  const hols=[...DB.holidays].sort((a,b)=>a.date.localeCompare(b.date));
+  return `<div class="pagehead"><div><h1>Configuration</h1><p>Rules that drive timecards, overtime, attendance, and pay.</p></div></div>
+  <div class="cfg-grid">
+    <div class="card">
+      <h2><i class="ti ti-calendar-dollar"></i> Pay period</h2>
+      <div class="formgrid">
+        <div class="field"><label>Frequency</label><input value="Biweekly · Monday–Sunday" disabled></div>
+        <div class="field"><label>Anchor (a period-start Monday)</label><input type="date" value="${CFG.payAnchor}" onchange="cfgSet('payAnchor',this.value)"></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Current pay period: <b>${weekLabel(pp)} – ${weekLabel(ymdAdd(pp,7))}</b> (${pp} → ${ymdAdd(pp,13)}).</div>
+    </div>
+    <div class="card">
+      <h2><i class="ti ti-adjustments"></i> Attendance thresholds</h2>
+      <div class="formgrid">
+        <div class="field"><label>Late after (min)</label><input type="number" min="0" value="${CFG.lateMin}" onchange="cfgSet('lateMin',this.value)"></div>
+        <div class="field"><label>Clock-in-early before (min)</label><input type="number" min="0" value="${CFG.earlyMin}" onchange="cfgSet('earlyMin',this.value)"></div>
+        <div class="field"><label>Leaving-early before (min)</label><input type="number" min="0" value="${CFG.leaveMin}" onchange="cfgSet('leaveMin',this.value)"></div>
+        <div class="field"><label>Duplicate-punch window (min)</label><input type="number" min="0" value="${CFG.dedupMin}" onchange="cfgSet('dedupMin',this.value)"></div>
+      </div>
+      <div class="hint" style="margin-top:8px">Duplicate punches of the same type within this window are merged — the latest source wins.</div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0"><i class="ti ti-confetti"></i> Company holidays</h2>
+        <button class="btn primary sm" onclick="openHoliday()"><i class="ti ti-plus"></i> Add holiday</button>
+      </div>
+      <div style="margin-top:12px">${hols.length?`<table><thead><tr><th>Date</th><th>Holiday</th><th class="num">Paid hrs</th><th></th></tr></thead><tbody>
+        ${hols.map(h=>`<tr><td>${ymdD(h.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:'UTC'})}</td>
+          <td>${h.name}</td><td class="num">${h2(h.hours)}</td>
+          <td style="text-align:right"><button class="excuse-btn" onclick="openHoliday('${h.id}')">edit</button></td></tr>`).join('')}
+      </tbody></table>`:`<div class="empty">No holidays yet. Add your company holiday calendar.</div>`}</div>
+      <div class="hint" style="margin-top:8px">Everyone receives Holiday hours on these dates; working a holiday is paid at the regular rate (no premium).</div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2><i class="ti ti-scale"></i> Overtime &amp; meal law (by state)</h2>
+      <table><thead><tr><th>State</th><th>Overtime</th><th>Meal law</th></tr></thead><tbody>
+        <tr><td>California</td><td>Daily 8h→1.5x, 12h→2x · weekly 40 · 7th-consecutive-day rule</td><td>30-min meal before 5th hour; premium owed</td></tr>
+        <tr><td>Pennsylvania</td><td>Weekly 40h→1.5x (federal)</td><td>No state mandate</td></tr>
+      </tbody></table>
+      <div class="hint" style="margin-top:8px">Each employee's state (set in the Employee tab) selects their ruleset automatically.</div>
+    </div>
+  </div>`;
+}
+
+/* ---------- EMPLOYEE: roster, settings, manager access ---------- */
+function viewEmployee(){
+  const managers = DB.employees.filter(e=>e.role!=='employee');
+  const emps = DB.employees.filter(e=>e.role==='employee').sort((a,b)=>a.name.localeCompare(b.name));
+  return `<div class="pagehead"><div><h1>Employee</h1><p>Profiles, timezones, pay rules, and manager access.</p></div></div>
+  <div class="card">
+    <h2><i class="ti ti-users"></i> Roster <span class="cbadge" style="background:var(--muted)">${emps.length}</span></h2>
+    <table class="roster"><thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th></tr></thead><tbody>
+    ${emps.map(e=>`
+      <tr>
+        <td><span class="empid">${e.empId||'—'}</span></td>
+        <td><div class="who">${e.name}</div></td>
+        <td>${e.dept||'—'}</td>
+        <td><select onchange="setField('${e.id}','loc',this.value)">
+            ${STATES.map(s=>`<option value="${s}" ${e.loc===s?'selected':''}>${STATE_RULES[s].label} (${s})</option>`).join('')}
+          </select></td>
+        <td><select onchange="setField('${e.id}','tz',this.value)">
+            ${Object.entries(TZ).map(([k,v])=>`<option value="${k}" ${e.tz===k?'selected':''}>${v}</option>`).join('')}
+          </select></td>
+        <td><select onchange="setField('${e.id}','mgr',this.value)">
+            ${managers.map(m=>`<option value="${m.id}" ${e.mgr===m.id?'selected':''}>${m.name}</option>`).join('')}
+          </select></td>
+        <td class="num"><input type="number" step="0.25" min="0" value="${(e.rate||0).toFixed(2)}" style="width:80px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:7px" onchange="setField('${e.id}','rate',+this.value)"></td>
+        <td><button class="toggle ${e.webPunch?'on':''}" onclick="setField('${e.id}','webPunch',${e.webPunch?'false':'true'})" title="${e.webPunch?'Can clock in/out from the web clock':'Biometric clock only'}"><span></span></button></td>
+      </tr>`).join('')}
+    </tbody></table>
+    <div class="hint">Changes save immediately. <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. Everyone can still open the web clock app.</div>
+  </div>
+
+  <div class="card">
+    <h2><i class="ti ti-user-shield"></i> Manager Access</h2>
+    <p class="hint" style="margin-bottom:12px">Which employees' timecards each manager can view and approve.</p>
+    <table><thead><tr><th>Manager</th><th>Can access</th></tr></thead><tbody>
+    ${managers.filter(m=>m.role==='manager').map(m=>`
+      <tr>
+        <td><div class="who">${m.name}</div><div class="sub">${m.loc} · ${TZ[m.tz]}</div></td>
+        <td><div class="chips">${emps.map(e=>{
+          const on = (m.manages||[]).includes(e.id);
+          return `<button class="chip" style="${on?'background:var(--navy);color:#fff':''}" onclick="toggleAccess('${m.id}','${e.id}')">${on?'✓ ':''}${e.name}</button>`;
+        }).join('')}</div></td>
+      </tr>`).join('')}
+    </tbody></table>
+  </div>`;
+}
+function setField(id, field, val){ emp(id)[field]=val; saveStore(); toast('Saved'); if(field==='mgr'){rebuildManages();} render(); }
+function rebuildManages(){
+  DB.employees.filter(m=>m.role==='manager').forEach(m=>{
+    m.manages = DB.employees.filter(e=>e.mgr===m.id).map(e=>e.id);
+  });
+}
+function toggleAccess(mgrId, empId){
+  const m = emp(mgrId); m.manages = m.manages||[];
+  if(m.manages.includes(empId)){ m.manages = m.manages.filter(x=>x!==empId); }
+  else { m.manages.push(empId); emp(empId).mgr = mgrId; }
+  saveStore(); render();
+}
+
+/* ---------- toast ---------- */
+let toastT=null;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* boot */
+rebuildManages();
+// seed some approval states + a pending correction request
+// (these would normally arrive from the separate web clock / manager review)
+(function seedState(){
+  const wk = id => currentWeekKey(emp(id));
+  const now = new Date().toISOString();
+  // David: employee + manager approved (per-segment); Karen: employee approved
+  weekSegIds('e2',wk('e2')).forEach(id=>{ DB.segApprovals[segKey(id,'E')]={by:'David Cruz',at:now}; DB.segApprovals[segKey(id,'M')]={by:'Luis Ramos',at:now}; });
+  recomputeWeekApproval('e2',wk('e2'));
+  weekSegIds('e3',wk('e3')).forEach(id=>{ DB.segApprovals[segKey(id,'E')]={by:'Karen Miller',at:now}; });
+  recomputeWeekApproval('e3',wk('e3'));
+  const friday = partsInTz(now,'America/Los_Angeles').ymd;
+  DB.requests.push({id:'r_seed1', emp:'e1', weekKey:wk('e1'), kind:'add', targetId:null,
+    proposed:{ymd:friday, time:'16:45', type:'out'}, note:'Forgot to clock out — left at 4:45pm',
+    status:'pending', by:'Maria Sanchez', at:now, resolvedBy:null, resolvedAt:null, resolveNote:null});
+  // sample schedule: overrides for e4 (first by ID) this + next week, and a recurring template
+  const mon = sundayOf(todayYmd(emp('e4')));
+  for(let w=0; w<2; w++){ for(let i=0;i<5;i++){
+    DB.schedules.push({id:'sc_seed'+w+i, emp:'e4', date:ymdAdd(mon, w*7+i), start:'08:00', end:'16:30', jobCode:'CA - REG', note:''});
+  }}
+  [1,2,3,4,5].forEach(wd=>DB.recurring.push({id:'rc_seed'+wd, emp:'e4', weekday:wd, start:'08:00', end:'16:30', jobCode:'CA - REG'}));
+  // sample attendance history + leave so points/tiers and payroll buckets show data
+  const t0=partsInTz(now,'America/Los_Angeles').ymd;
+  DB.occurrences.push({id:'oc_s1', emp:'e3', date:ymdAdd(t0,-40), code:'NCNS', note:'No call/no show', by:'Beth Owens', at:now});
+  DB.occurrences.push({id:'oc_s2', emp:'e3', date:ymdAdd(t0,-12), code:'CL', note:'Called in late', by:'Beth Owens', at:now});
+  DB.occurrences.push({id:'oc_s3', emp:'e1', date:ymdAdd(t0,-20), code:'CL', note:'Called in late', by:'Luis Ramos', at:now});
+  DB.leave.push({id:'lv_s1', emp:'e2', date:ymdAdd(sundayOf(t0),2), type:'PTO', hours:8, note:'Vacation day'});
+  DB.leave.push({id:'lv_s2', emp:'e1', date:ymdAdd(sundayOf(t0),4), type:'Sick', hours:4, note:''});
+  // company holiday within the current pay period + a manual rest-break premium
+  DB.holidays.push({id:'hol_s1', date:ymdAdd(sundayOf(t0),0), name:'Company Holiday', hours:8});
+  DB.premiums.push({id:'pm_s1', emp:'e1', date:ymdAdd(sundayOf(t0),1), hours:1, reason:'Missed rest break', by:'Jose Hernandez', at:now});
+})();
+render();
+</script>
+</body>
+</html>

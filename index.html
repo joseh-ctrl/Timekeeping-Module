@@ -1363,14 +1363,19 @@ function daySegments(punches){
   [...punches].sort((a,b)=>new Date(a.ts)-new Date(b.ts)).forEach(p=>{
     const t=new Date(p.ts).getTime();
     if(p.type==='in'||p.type==='meal_end'||p.type==='break_end'){
+      // a new start while a segment is still open = the prior one was never closed
+      if(seg){ seg.issue='Missing out punch'; segs.push(seg); seg=null; }
       if(pend && segs.length){ const prev=segs[segs.length-1]; prev.breakMin=(t-pend.t)/60000; prev.breakPaid=pend.paid; }
+      const orphanResume = !pend && (p.type==='meal_end'||p.type==='break_end'); // resume with no matching start
       pend=null; seg={inId:p.id, outId:null, in:p.ts, out:null, hrs:0, breakMin:null, breakPaid:false, manual:p.source==='manual'};
+      if(orphanResume) seg.issue=`Unmatched ${labelType(p.type)}`;
     } else if(p.type==='out'||p.type==='meal_start'||p.type==='break_start'){
       if(seg){ seg.out=p.ts; seg.outId=p.id; seg.hrs=(t-new Date(seg.in).getTime())/3600000; if(p.source==='manual')seg.manual=true; segs.push(seg); seg=null; }
+      else { segs.push({inId:p.id, outId:p.id, in:p.ts, out:p.ts, hrs:0, breakMin:null, breakPaid:false, manual:p.source==='manual', issue:`Unmatched ${labelType(p.type)}`}); }
       pend = p.type==='meal_start' ? {t,paid:false} : p.type==='break_start' ? {t,paid:true} : null;
     }
   });
-  if(seg) segs.push(seg);
+  if(seg){ seg.issue=seg.issue||'Missing out punch'; segs.push(seg); }
   return segs;
 }
 function segKey(inId,L){return `${inId}|${L}`;}
@@ -1524,8 +1529,8 @@ function renderTimecard(empId, weekKey, viewerLayer){
       const bl=s.breakMin!=null?(s.breakPaid?(s.breakMin<=12?`${Math.round(s.breakMin)}p`:`12p ${Math.round(s.breakMin-12)}u`):`${Math.round(s.breakMin)}u`):'';
       const last=si===segs.length-1;
       const veryLast=di===days.length-1 && last;
-      const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}`;
-      const outCell=s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>';
+      const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}${s.issue?` <i class="ti ti-alert-triangle" style="color:var(--bad);font-size:11px" title="${s.issue}"></i>`:''}`;
+      const outCell=s.issue&&s.out===s.in?`<span style="color:var(--bad)">${s.issue}</span>`:(s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>');
       body+=`<tr class="${si===0?'tc-day':''}">
         <td>${dayExc?`<span class="dot" title="${d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).join('; ')}"></span>`:''}</td>
         <td class="apcol">${box(s.inId,'E')}</td><td class="apcol">${box(s.inId,'M')}</td><td class="apcol">${box(s.inId,'O')}</td>

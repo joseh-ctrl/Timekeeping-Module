@@ -2346,7 +2346,7 @@ function viewEmployee(){
   return `<div class="pagehead"><div><h1>Employee</h1><p>Profiles, timezones, pay rules, and manager access.</p></div></div>
   <div class="card">
     <h2><i class="ti ti-users"></i> Roster <span class="cbadge" style="background:var(--muted)">${emps.length}</span></h2>
-    <table class="roster"><thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th></tr></thead><tbody>
+    <table class="roster"><thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th><th>Remote</th></tr></thead><tbody>
     ${emps.map(e=>`
       <tr>
         <td><span class="empid">${e.empId||'—'}</span></td>
@@ -2363,9 +2363,10 @@ function viewEmployee(){
           </select></td>
         <td class="num"><input type="number" step="0.25" min="0" value="${(e.rate||0).toFixed(2)}" style="width:80px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:7px" onchange="setField('${e.id}','rate',+this.value)"></td>
         <td><button class="toggle ${e.webPunch?'on':''}" onclick="setField('${e.id}','webPunch',${e.webPunch?'false':'true'})" title="${e.webPunch?'Can clock in/out from the web clock':'Biometric clock only'}"><span></span></button></td>
+        <td><button class="toggle ${e.remote!==false?'on':''}" onclick="setField('${e.id}','remote',${e.remote!==false?'false':'true'})" title="${e.remote!==false?'Remote — stays signed in on their own device':'On-site terminal — auto-signs-out after each punch'}"><span></span></button></td>
       </tr>`).join('')}
     </tbody></table>
-    <div class="hint">Changes save immediately. <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. Everyone can still open the web clock app.</div>
+    <div class="hint">Changes save immediately. <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch so the next person enters their own PIN.</div>
   </div>
 
   <div class="card">

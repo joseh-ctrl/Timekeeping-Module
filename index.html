@@ -460,8 +460,8 @@ const Store = (() => {
     setSeg(inId,layer,empId,by){ return enabled ? sb.from('seg_approvals').upsert({in_punch_id:inId,layer,employee_id:empId,by_name:by}, {onConflict:'in_punch_id,layer'}) : null; },
     clearSeg(inId,layer){ return enabled ? sb.from('seg_approvals').delete().match({in_punch_id:inId,layer}) : null; },
     setNote(inId,empId,note,by){ return enabled ? (note ? sb.from('seg_notes').upsert({in_punch_id:inId,employee_id:empId,note,by_name:by}) : sb.from('seg_notes').delete().eq('in_punch_id',inId)) : null; },
-    decidePunchRequest(id,status,by){ return enabled ? sb.from('punch_requests').update({status,decided_by:by,decided_at:new Date().toISOString()}).eq('id',id) : null; },
-    decidePtoRequest(id,status,by){ return enabled ? sb.from('pto_requests').update({status,decided_by:by,decided_at:new Date().toISOString()}).eq('id',id) : null; },
+    decidePunchRequest(id,status,by){ return enabled ? sb.from('punch_requests').update({status,decided_by:by,decided_at:new Date().toISOString()}).eq('id',id).select() : null; },
+    decidePtoRequest(id,status,by){ return enabled ? sb.from('pto_requests').update({status,decided_by:by,decided_at:new Date().toISOString()}).eq('id',id).select() : null; },
     addLeave(l){ return enabled ? sb.from('leave_entries').insert({id:l.id,employee_id:l.emp,date:l.date,type:l.type,hours:l.hours,note:l.note,source_request_id:l.sourceId||null}) : null; },
     removeLeave(id){ return enabled ? sb.from('leave_entries').delete().eq('id',id) : null; },
     addOccurrence(o){ return enabled ? sb.from('occurrences').insert({id:o.id,employee_id:o.emp,date:o.date,code:o.code,note:o.note,by_name:o.by}) : null; },
@@ -1367,7 +1367,10 @@ function recomputeWeekApproval(empId,weekKey){
     if(all && !a[layer]) a[layer]={by:me().name,at:now}; else if(!all && a[layer]) a[layer]=null; });
   a.locked = !!(a.employee&&a.manager&&a.hr);
 }
-function chk(p,label){ if(p&&p.then) p.then(r=>{ if(r&&r.error){ console.error(label+' failed:',r.error); toast('⚠ '+label+' not saved — '+(r.error.message||'try again')); } }); return p; }
+function chk(p,label){ if(p&&p.then) p.then(r=>{
+  if(r&&r.error){ console.error(label+' failed:',r.error); toast('⚠ '+label+' not saved — '+(r.error.message||'try again')); }
+  else if(r&&Array.isArray(r.data)&&r.data.length===0){ console.warn(label+': update affected 0 rows (blocked by RLS?)'); toast('⚠ '+label+' did not save (permission?)'); }
+}); return p; }
 function toggleSeg(inId,L,empId,weekKey){
   if(!canToggleLayer(L,empId) || getApproval(empId,weekKey).locked) return;
   const k=segKey(inId,L);
@@ -1731,10 +1734,10 @@ function approveTimeOff(id){ const r=DB.ptoRequests.find(x=>x.id===id); if(!r||r
   r.days.forEach(d=>{ const l={id:'lv'+Date.now()+Math.random().toString(36).slice(2,5), emp:r.emp, date:d.ymd, type:r.type, hours:d.hours, note:r.note||'Approved time off', sourceId:r.id};
     DB.leave.push(l); Store.addLeave(l); });
   r.status='approved'; r.decidedBy=me().name; r.decidedAt=new Date().toISOString();
-  Store.decidePtoRequest(r.id,'approved',me().name); toast('Approved — posted as leave hours'); render(); }
+  chk(Store.decidePtoRequest(r.id,'approved',me().name),'Approval'); toast('Approved — posted as leave hours'); render(); }
 function denyTimeOff(id){ const r=DB.ptoRequests.find(x=>x.id===id); if(!r||r.status!=='pending')return;
   r.status='denied'; r.decidedBy=me().name; r.decidedAt=new Date().toISOString();
-  Store.decidePtoRequest(r.id,'denied',me().name); toast('Request denied'); render(); }
+  chk(Store.decidePtoRequest(r.id,'denied',me().name),'Denial'); toast('Request denied'); render(); }
 
 function viewTimeOff(){
   const scope=ptoScope();

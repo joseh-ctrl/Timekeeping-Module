@@ -547,17 +547,16 @@ const Live = (() => {
         catch(e){ console.warn('[live] setAuth failed', e); }
         return false;
       }
-      const authed = await pushAuth();
-      console.log('[live] starting — authed socket:', authed);
+      await pushAuth();
       sb.auth.onAuthStateChange((_e, s)=>{ if(s && sb.realtime && sb.realtime.setAuth) sb.realtime.setAuth(s.access_token); });
       ch = Store.subscribe(TABLES,
-        p=>{ console.log('[live] change', p.table, p.eventType); schedule(); },
-        status=>{ console.log('[live] status', status); if(status==='SUBSCRIBED') schedule(); });
+        p=>{ schedule(); },
+        status=>{ if(status==='SUBSCRIBED') schedule(); });
       // Broadcast bus — RLS-proof cross-app signal. Any write in either app
       // pings this shared channel; the other app re-syncs through its own
       // authenticated query, so no data rides on the wire.
       bus = sb.channel('hr-sync', { config:{ broadcast:{ self:false } } });
-      bus.on('broadcast', { event:'changed' }, ()=>{ console.log('[live] ping'); schedule(); });
+      bus.on('broadcast', { event:'changed' }, ()=>schedule());
       bus.subscribe();
       window.__hrPing = ping;
       document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) schedule(); });

@@ -465,15 +465,20 @@ const Store = (() => {
     addLeave(l){ return enabled ? sb.from('leave_entries').insert({id:l.id,employee_id:l.emp,date:l.date,type:l.type,hours:l.hours,note:l.note,source_request_id:l.sourceId||null}) : null; },
     removeLeave(id){ return enabled ? sb.from('leave_entries').delete().eq('id',id) : null; },
     addOccurrence(o){ return enabled ? sb.from('occurrences').insert({id:o.id,employee_id:o.emp,date:o.date,code:o.code,note:o.note,by_name:o.by}) : null; },
+    removeOccurrence(id){ return enabled ? sb.from('occurrences').delete().eq('id',id) : null; },
     addPremium(p){ return enabled ? sb.from('premiums').insert({id:p.id,employee_id:p.emp,date:p.date,hours:p.hours,reason:p.reason,by_name:p.by}) : null; },
+    removePremium(id){ return enabled ? sb.from('premiums').delete().eq('id',id) : null; },
     addHoliday(h){ return enabled ? sb.from('holidays').upsert({id:h.id,date:h.date,name:h.name,hours:h.hours}) : null; },
     removeHoliday(id){ return enabled ? sb.from('holidays').delete().eq('id',id) : null; },
     saveSchedule(s){ return enabled ? sb.from('schedules').upsert({id:s.id,employee_id:s.emp,date:s.date,start_time:s.start,end_time:s.end,job_code:s.jobCode,note:s.note}) : null; },
     removeSchedule(id){ return enabled ? sb.from('schedules').delete().eq('id',id) : null; },
+    saveRecurring(s){ return enabled ? sb.from('recurring_schedules').upsert({id:s.id,employee_id:s.emp,weekday:s.weekday,start_time:s.start,end_time:s.end,job_code:s.jobCode,note:s.note}) : null; },
+    removeRecurring(id){ return enabled ? sb.from('recurring_schedules').delete().eq('id',id) : null; },
     setExcused(id,empId,ymd,flag,on,by){ return enabled ? (on ? sb.from('excused_exceptions').upsert({id,employee_id:empId,ymd,flag,by_name:by}) : sb.from('excused_exceptions').delete().eq('id',id)) : null; },
     ackAlert(empId,key,by){ return enabled ? sb.from('ack_alerts').upsert({employee_id:empId,alert_key:key,by_name:by}) : null; },
     audit(a){ return enabled ? sb.from('audit_log').insert({action:a.action,employee_id:a.emp,week_key:a.weekKey,punch_id:a.punchId,before:a.before,after:a.after,by_name:a.by,reason:a.reason}) : null; },
     savePayrollBatch(b){ return enabled ? sb.from('payroll_batches').insert({id:b.id||('pb'+Date.now()),version:b.version,period_start:b.start,period_stop:b.stop,rows:b.rows,status:b.status,by_name:b.by}) : null; },
+    reopenBatch(start,stop){ return enabled ? sb.from('payroll_batches').update({status:'reopened'}).eq('period_start',start).eq('period_stop',stop) : null; },
     saveReportConfig(c){ return enabled ? sb.from('report_configs').upsert({id:c.id,name:c.name,cols:c.cols,grp:c.group,filter_dept:c.filterDept,owner:c.owner}) : null; },
     removeReportConfig(id){ return enabled ? sb.from('report_configs').delete().eq('id',id) : null; },
     subscribe(tables,onChange){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); return ch.subscribe(); },
@@ -750,16 +755,17 @@ function setApproval(empId, weekKey, layer, on){
 }
 
 function unlockCard(empId, weekKey){
-  DB.approvals[approvalKey(empId,weekKey)]={employee:null,manager:null,hr:null,locked:false};
+  weekSegIds(empId,weekKey).forEach(id=>{ delete DB.segApprovals[segKey(id,'O')]; chk(Store.clearSeg(id,'O'),'Unlock'); });
+  recomputeWeekApproval(empId,weekKey);
   audit('unlock', empId, weekKey, null, null, null, me().name, 'Timecard unlocked for edit');
-  saveStore(); toast('Timecard unlocked'); render();
+  toast('Timecard unlocked'); render();
 }
 function toggleExcuse(empId, ymd, flagEnc){
   const flag=decodeURIComponent(flagEnc); const k=excuseKey(empId,ymd,flag);
-  const wk=sundayOf(ymd);
-  if(DB.excused[k]){ delete DB.excused[k]; audit('excuse', empId, wk, null, null, null, me().name, 'Removed flag override: '+flag); }
-  else { DB.excused[k]={by:me().name, at:new Date().toISOString()}; audit('excuse', empId, wk, null, null, null, me().name, 'Flag overridden (excused): '+flag); }
-  saveStore(); render();
+  const wk=sundayOf(ymd); const id='ex'+Date.now();
+  if(DB.excused[k]){ delete DB.excused[k]; chk(Store.setExcused(k,empId,ymd,flag,false,me().name),'Excuse'); audit('excuse', empId, wk, null, null, null, me().name, 'Removed flag override: '+flag); }
+  else { DB.excused[k]={by:me().name, at:new Date().toISOString()}; chk(Store.setExcused(k,empId,ymd,flag,true,me().name),'Excuse'); audit('excuse', empId, wk, null, null, null, me().name, 'Flag overridden (excused): '+flag); }
+  render();
 }
 
 /* ============================================================
@@ -891,15 +897,16 @@ function reqSet(f,v){
 }
 function submitRequest(){
   if(!REQ.note.trim()){ toast('Add a note explaining the correction'); return; }
-  DB.requests.push({
+  const r={
     id:'r'+Date.now()+Math.random().toString(36).slice(2,5),
     emp:REQ.empId, weekKey:REQ.weekKey, kind:REQ.kind,
     targetId:REQ.kind==='fix'?REQ.targetId:null,
     proposed:{ymd:REQ.ymd, time:REQ.time, type:REQ.type},
     note:REQ.note, status:'pending', by:me().name, at:new Date().toISOString(),
     resolvedBy:null, resolvedAt:null, resolveNote:null
-  });
-  REQ=null; saveStore(); toast('Correction request sent to your manager & HR'); render();
+  };
+  DB.requests.push(r); chk(Store.addPunchRequest(r),'Request');
+  REQ=null; toast('Correction request sent to your manager & HR'); render();
 }
 function applyRequest(reqId){
   const r=DB.requests.find(x=>x.id===reqId); if(!r) return; const e=emp(r.emp);
@@ -907,22 +914,22 @@ function applyRequest(reqId){
   const reason=`Employee request: ${r.note}`;
   if(r.kind==='add'){
     const np={id:'p'+Date.now()+Math.random().toString(36).slice(2,5), emp:r.emp, ts:iso, type:r.proposed.type, source:'manual', editedBy:me().name};
-    DB.punches.push(np); audit('add', r.emp, r.weekKey, np.id, null, {time:r.proposed.time,type:r.proposed.type}, me().name, reason);
+    DB.punches.push(np); chk(Store.addPunch(np),'Apply'); audit('add', r.emp, r.weekKey, np.id, null, {time:r.proposed.time,type:r.proposed.type}, me().name, reason);
   } else {
     const p=DB.punches.find(x=>x.id===r.targetId);
-    if(p){ const b={time:hhmm(p.ts,e),type:p.type}; p.ts=iso; p.type=r.proposed.type; p.source='manual'; p.editedBy=me().name;
+    if(p){ const b={time:hhmm(p.ts,e),type:p.type}; p.ts=iso; p.type=r.proposed.type; p.source='manual'; p.editedBy=me().name; chk(Store.editPunch(p),'Apply');
       audit('edit', r.emp, r.weekKey, p.id, b, {time:r.proposed.time,type:r.proposed.type}, me().name, reason); }
   }
   const a=getApproval(r.emp,r.weekKey);
-  if(a.employee||a.manager||a.hr){ DB.approvals[approvalKey(r.emp,r.weekKey)]={employee:null,manager:null,hr:null,locked:false};
+  if(a.employee||a.manager||a.hr){ resetWeekApprovals(r.emp,r.weekKey);
     audit('reset', r.emp, r.weekKey, null,null,null, me().name, 'Approvals reset after applying request'); }
   r.status='applied'; r.resolvedBy=me().name; r.resolvedAt=new Date().toISOString();
-  saveStore(); toast('Correction applied'); render();
+  chk(Store.decidePunchRequest(r.id,'applied',me().name),'Apply'); toast('Correction applied'); render();
 }
 function declineRequest(reqId){
   const r=DB.requests.find(x=>x.id===reqId); if(!r) return;
   r.status='declined'; r.resolvedBy=me().name; r.resolvedAt=new Date().toISOString();
-  saveStore(); toast('Request declined'); render();
+  chk(Store.decidePunchRequest(r.id,'declined',me().name),'Decline'); toast('Request declined'); render();
 }
 
 function renderReqBanner(empId, weekKey, openReqs, isEmployeeView){
@@ -1124,8 +1131,8 @@ function alertsFor(u){
   return out.map(a=>({...a, key:`${a.emp}|${a.type}|${a.date}`})).filter(a=>!DB.ackAlerts[a.key]);
 }
 function md(ymd){ return ymdD(ymd).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'}); }
-function ackAlert(key){ DB.ackAlerts[key]={by:me().name, at:new Date().toISOString()}; saveStore(); render(); }
-function ackAllFor(empId){ alertsFor(me()).filter(a=>a.emp===empId).forEach(a=>DB.ackAlerts[a.key]={by:me().name,at:new Date().toISOString()}); saveStore(); render(); }
+function ackAlert(key){ DB.ackAlerts[key]={by:me().name, at:new Date().toISOString()}; const a=alertsFor(me()).find(x=>x.key===key); chk(Store.ackAlert(a?a.emp:me().id, key, me().name),'Acknowledge'); render(); }
+function ackAllFor(empId){ alertsFor(me()).filter(a=>a.emp===empId).forEach(a=>{ DB.ackAlerts[a.key]={by:me().name,at:new Date().toISOString()}; chk(Store.ackAlert(a.emp, a.key, me().name),'Acknowledge'); }); render(); }
 
 function viewNotifications(){
   const u=me(); const alerts=alertsFor(u);
@@ -1705,11 +1712,12 @@ function leSet(f,v){ LEDIT[f]=f==='hours'?+v:v; }
 function closeLeave(){ LEDIT=null; render(); }
 function saveLeave(){
   if(!(LEDIT.hours>0)){ toast('Enter hours'); return; }
-  if(LEDIT.id) Object.assign(DB.leave.find(x=>x.id===LEDIT.id),{date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
-  else DB.leave.push({id:'lv'+Date.now(),emp:LEDIT.empId,date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
-  LEDIT=null; saveStore(); toast('Leave saved'); render();
+  if(LEDIT.id){ const l=DB.leave.find(x=>x.id===LEDIT.id); Object.assign(l,{date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
+    chk(Store.removeLeave(l.id),'Leave'); chk(Store.addLeave(l),'Leave'); }
+  else { const l={id:'lv'+Date.now(),emp:LEDIT.empId,date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note}; DB.leave.push(l); chk(Store.addLeave(l),'Leave'); }
+  LEDIT=null; toast('Leave saved'); render();
 }
-function deleteLeave(){ if(LEDIT.id) DB.leave=DB.leave.filter(x=>x.id!==LEDIT.id); LEDIT=null; saveStore(); toast('Removed'); render(); }
+function deleteLeave(){ if(LEDIT.id){ DB.leave=DB.leave.filter(x=>x.id!==LEDIT.id); chk(Store.removeLeave(LEDIT.id),'Leave'); } LEDIT=null; toast('Removed'); render(); }
 function leavePeriod(empId,start,stop){
   const t={PTO:0,Sick:0,Holiday:0,Bereavement:0};
   DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
@@ -1780,11 +1788,12 @@ function openOcc(empId, date){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;PEDIT=nu
 function oeSet(f,v){ OEDIT[f]=v; }
 function closeOcc(){ OEDIT=null; render(); }
 function saveOcc(){
-  DB.occurrences.push({id:'oc'+Date.now(),emp:OEDIT.empId,date:OEDIT.date,code:OEDIT.code,note:OEDIT.note,by:me().name,at:new Date().toISOString()});
+  const o={id:'oc'+Date.now(),emp:OEDIT.empId,date:OEDIT.date,code:OEDIT.code,note:OEDIT.note,by:me().name,at:new Date().toISOString()};
+  DB.occurrences.push(o); chk(Store.addOccurrence(o),'Occurrence');
   audit('excuse',OEDIT.empId,sundayOf(OEDIT.date),null,null,null,me().name,`Occurrence added: ${OEDIT.code}`);
-  OEDIT=null; saveStore(); toast('Occurrence recorded'); render();
+  OEDIT=null; toast('Occurrence recorded'); render();
 }
-function deleteOcc(id, empId, date){ DB.occurrences=DB.occurrences.filter(x=>x.id!==id); saveStore(); render(); }
+function deleteOcc(id, empId, date){ DB.occurrences=DB.occurrences.filter(x=>x.id!==id); chk(Store.removeOccurrence(id),'Occurrence'); render(); }
 
 /* manual premium modal */
 let PEDIT=null;
@@ -1794,10 +1803,11 @@ function peSet(f,v){ PEDIT[f]=f==='hours'?+v:v; }
 function closePremium(){ PEDIT=null; render(); }
 function savePremium(){
   if(!(PEDIT.hours>0)){ toast('Enter hours'); return; }
-  DB.premiums.push({id:'pm'+Date.now(),emp:PEDIT.empId,date:PEDIT.date,hours:PEDIT.hours,reason:PEDIT.reason,by:me().name,at:new Date().toISOString()});
-  PEDIT=null; saveStore(); toast('Premium added'); render();
+  const p={id:'pm'+Date.now(),emp:PEDIT.empId,date:PEDIT.date,hours:PEDIT.hours,reason:PEDIT.reason,by:me().name,at:new Date().toISOString()};
+  DB.premiums.push(p); chk(Store.addPremium(p),'Premium');
+  PEDIT=null; toast('Premium added'); render();
 }
-function deletePremium(id){ DB.premiums=DB.premiums.filter(x=>x.id!==id); saveStore(); render(); }
+function deletePremium(id){ DB.premiums=DB.premiums.filter(x=>x.id!==id); chk(Store.removePremium(id),'Premium'); render(); }
 
 /* payroll hand-off */
 let PAYVIEW=null;
@@ -1823,17 +1833,22 @@ function confirmSendPayroll(){
   const rows=buildPayrollRows(start,stop);
   const prev=batchForPeriod(start,stop);
   const version=(prev?prev.version||1:0)+1;
-  DB.payrollBatches.push({id:'pb'+Date.now(), start, stop, at:now, by, status:'sent', version, rows});
-  PAYVIEW={...PAYVIEW, step:'done', rows}; saveStore(); toast('Period approved & sent to Payroll'); render();
+  const batch={id:'pb'+Date.now(), start, stop, at:now, by, status:'sent', version, rows};
+  DB.payrollBatches.push(batch); chk(Store.savePayrollBatch(batch),'Payroll');
+  PAYVIEW={...PAYVIEW, step:'done', rows}; toast('Period approved & sent to Payroll'); render();
 }
 function reopenPeriod(start,stop){
   const b=batchForPeriod(start,stop); if(b) b.status='reopened';
   DB.employees.filter(e=>e.role==='employee').forEach(e=>{
     let cur=sundayOf(start);
-    while(cur<=stop){ const a=DB.approvals[approvalKey(e.id,cur)]; if(a) a.locked=false; cur=ymdAdd(cur,7); }
+    while(cur<=stop){
+      weekSegIds(e.id,cur).forEach(id=>{ delete DB.segApprovals[segKey(id,'O')]; chk(Store.clearSeg(id,'O'),'Reopen'); });
+      recomputeWeekApproval(e.id,cur); cur=ymdAdd(cur,7);
+    }
   });
+  chk(Store.reopenBatch(start,stop),'Reopen');
   audit('excuse','—',start,null,null,null,me().name,'Payroll period reopened for correction');
-  saveStore(); toast('Period reopened — timecards unlocked'); render();
+  toast('Period reopened — timecards unlocked'); render();
 }
 function closePay(){ PAYVIEW=null; render(); }
 
@@ -2089,17 +2104,20 @@ function closeSched(){ SEDIT=null; render(); }
 function saveSched(){
   if(SEDIT.end<=SEDIT.start){ toast('End time must be after start'); return; }
   if(SEDIT.mode==='overrides'){
-    if(SEDIT.id){ Object.assign(DB.schedules.find(x=>x.id===SEDIT.id),{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note}); }
-    else DB.schedules.push({id:'sc'+Date.now(),emp:SEDIT.empId,date:SEDIT.date,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note});
+    let s; if(SEDIT.id){ s=DB.schedules.find(x=>x.id===SEDIT.id); Object.assign(s,{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note}); }
+    else { s={id:'sc'+Date.now(),emp:SEDIT.empId,date:SEDIT.date,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode,note:SEDIT.note}; DB.schedules.push(s); }
+    chk(Store.saveSchedule(s),'Schedule');
   } else {
-    if(SEDIT.id){ Object.assign(DB.recurring.find(x=>x.id===SEDIT.id),{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode}); }
-    else DB.recurring.push({id:'rc'+Date.now(),emp:SEDIT.empId,weekday:SEDIT.weekday,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode});
+    let s; if(SEDIT.id){ s=DB.recurring.find(x=>x.id===SEDIT.id); Object.assign(s,{start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode}); }
+    else { s={id:'rc'+Date.now(),emp:SEDIT.empId,weekday:SEDIT.weekday,start:SEDIT.start,end:SEDIT.end,jobCode:SEDIT.jobCode}; DB.recurring.push(s); }
+    chk(Store.saveRecurring(s),'Schedule');
   }
-  SEDIT=null; saveStore(); toast('Schedule saved'); render();
+  SEDIT=null; toast('Schedule saved'); render();
 }
 function deleteSched(){
-  if(SEDIT.id){ if(SEDIT.mode==='overrides') DB.schedules=DB.schedules.filter(x=>x.id!==SEDIT.id); else DB.recurring=DB.recurring.filter(x=>x.id!==SEDIT.id); }
-  SEDIT=null; saveStore(); toast('Removed'); render();
+  if(SEDIT.id){ if(SEDIT.mode==='overrides'){ DB.schedules=DB.schedules.filter(x=>x.id!==SEDIT.id); chk(Store.removeSchedule(SEDIT.id),'Schedule'); }
+    else { DB.recurring=DB.recurring.filter(x=>x.id!==SEDIT.id); chk(Store.removeRecurring(SEDIT.id),'Schedule'); } }
+  SEDIT=null; toast('Removed'); render();
 }
 
 function viewSchedules(){
@@ -2306,11 +2324,12 @@ function exportTimecard(empId,fmt){
 }
 function saveReportConfig(){
   if(!REPORT.saveName.trim()){ toast('Name the report'); return; }
-  DB.reportConfigs.push({id:'rc'+Date.now(),name:REPORT.saveName.trim(),cols:REPORT.cols.slice(),group:REPORT.group,filterDept:REPORT.filterDept});
-  REPORT.saveName=''; saveStore(); toast('Report saved'); render();
+  const c={id:'rc'+Date.now(),name:REPORT.saveName.trim(),cols:REPORT.cols.slice(),group:REPORT.group,filterDept:REPORT.filterDept,owner:me().id};
+  DB.reportConfigs.push(c); chk(Store.saveReportConfig(c),'Report');
+  REPORT.saveName=''; toast('Report saved'); render();
 }
 function loadReportConfig(id){ const c=DB.reportConfigs.find(x=>x.id===id); if(c){ REPORT.cols=c.cols.slice(); REPORT.group=c.group; REPORT.filterDept=c.filterDept; render(); } }
-function deleteReportConfig(id){ DB.reportConfigs=DB.reportConfigs.filter(x=>x.id!==id); saveStore(); render(); }
+function deleteReportConfig(id){ DB.reportConfigs=DB.reportConfigs.filter(x=>x.id!==id); chk(Store.removeReportConfig(id),'Report'); render(); }
 
 function viewReports(){
   if(!REPORT) initReport();
@@ -2385,11 +2404,12 @@ function heSet(f,v){ HEDIT[f]=f==='hours'?+v:v; }
 function closeHoliday(){ HEDIT=null; render(); }
 function saveHoliday(){
   if(!HEDIT.name.trim()){ toast('Enter a name'); return; }
-  if(HEDIT.id) Object.assign(DB.holidays.find(x=>x.id===HEDIT.id),{date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours});
-  else DB.holidays.push({id:'hol'+Date.now(),date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours});
-  HEDIT=null; saveStore(); toast('Holiday saved'); render();
+  let h;
+  if(HEDIT.id){ h=DB.holidays.find(x=>x.id===HEDIT.id); Object.assign(h,{date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours}); }
+  else { h={id:'hol'+Date.now(),date:HEDIT.date,name:HEDIT.name,hours:HEDIT.hours}; DB.holidays.push(h); }
+  chk(Store.addHoliday(h),'Holiday'); HEDIT=null; toast('Holiday saved'); render();
 }
-function deleteHoliday(id){ DB.holidays=DB.holidays.filter(x=>x.id!==id); saveStore(); render(); }
+function deleteHoliday(id){ DB.holidays=DB.holidays.filter(x=>x.id!==id); chk(Store.removeHoliday(id),'Holiday'); render(); }
 function renderHolidayModal(){
   const host=document.getElementById('modal');
   host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${HEDIT.id?'Edit':'Add'} holiday</b></div>

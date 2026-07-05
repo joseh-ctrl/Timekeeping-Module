@@ -448,7 +448,7 @@ const Store = (() => {
       const segNotesO={}; (segNotes.data||[]).forEach(r=>segNotesO[r.in_punch_id]=r.note);
       const ackAlerts={}; (ack.data||[]).forEach(r=>ackAlerts[r.alert_key]={by:r.by_name,at:r.at});
       const excused={}; (exc.data||[]).forEach(r=>excused[`${r.employee_id}|${r.ymd}|${r.flag}`]=true);
-      const payrollBatches={}; batches.forEach(b=>payrollBatches[b.key]=b);
+      const payrollBatches=batches.slice();
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc };
     },

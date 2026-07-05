@@ -713,13 +713,15 @@ function buildTimecard(empId, weekKey){
 
   const days = Object.keys(byDay).sort().map(ymd=>{
     const ps = byDay[ymd]; let worked=0, mealMin=0, exceptions=[]; let mealViol=false;
-    let inT=null, mealT=null;
+    let inT=null, mealT=null, breakT=null;
     ps.forEach(p=>{
       const t = new Date(p.ts).getTime();
       if(p.type==='in') inT=t;
       else if(p.type==='out'){ if(inT){worked+=t-inT; inT=null;} else exceptions.push('Out with no In'); }
       else if(p.type==='meal_start'){ mealT=t; if(inT){worked+=t-inT; inT=null;} }
       else if(p.type==='meal_end'){ if(mealT){mealMin+=(t-mealT)/60000; inT=t; mealT=null;} }
+      else if(p.type==='break_start'){ breakT=t; if(inT){worked+=t-inT; inT=null;} }
+      else if(p.type==='break_end'){ if(breakT){ const dur=(t-breakT)/60000; worked+=Math.min(dur,12)*60000; inT=t; breakT=null; } } // paid up to 12 min, excess unpaid
     });
     if(inT) exceptions.push('Missing out punch');
     const hrs = worked/3600000;
@@ -1519,7 +1521,7 @@ function renderTimecard(empId, weekKey, viewerLayer){
     }
     segs.forEach((s,si)=>{
       const note=DB.segNotes[s.inId];
-      const bl=s.breakMin!=null?`${Math.round(s.breakMin)}${s.breakPaid?'p':'u'}`:'';
+      const bl=s.breakMin!=null?(s.breakPaid?(s.breakMin<=12?`${Math.round(s.breakMin)}p`:`12p ${Math.round(s.breakMin-12)}u`):`${Math.round(s.breakMin)}u`):'';
       const last=si===segs.length-1;
       const veryLast=di===days.length-1 && last;
       const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}`;

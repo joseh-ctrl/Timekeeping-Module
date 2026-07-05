@@ -481,7 +481,8 @@ const Store = (() => {
     reopenBatch(start,stop){ return enabled ? sb.from('payroll_batches').update({status:'reopened'}).eq('period_start',start).eq('period_stop',stop) : null; },
     saveReportConfig(c){ return enabled ? sb.from('report_configs').upsert({id:c.id,name:c.name,cols:c.cols,grp:c.group,filter_dept:c.filterDept,owner:c.owner}) : null; },
     removeReportConfig(id){ return enabled ? sb.from('report_configs').delete().eq('id',id) : null; },
-    subscribe(tables,onChange){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); return ch.subscribe(); },
+    subscribe(tables,onChange,onStatus){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); ch.subscribe(onStatus); return ch; },
+    removeChannel(ch){ if(enabled && ch) sb.removeChannel(ch); },
   };
 })();
 // Supabase query builders are lazy — they only execute when .then() is called.
@@ -501,6 +502,45 @@ const Store = (() => {
       return b;
     };
   });
+})();
+
+/* ============================================================
+   LIVE — Supabase realtime. On any change to a watched table
+   (from the web clock, another manager, or this app), re-pull the
+   snapshot via loadAll() and re-render. Reload-on-change reuses the
+   exact hydration path afterAuth() uses, so nested shapes stay
+   correct. Debounced so a burst collapses into one refresh; deferred
+   while a field is focused so it never yanks the cursor mid-edit;
+   re-syncs on (re)subscribe and tab re-focus to catch missed events.
+============================================================ */
+const Live = (() => {
+  const TABLES = ['punches','seg_approvals','seg_notes','punch_requests','pto_requests',
+    'leave_entries','occurrences','premiums','holidays','schedules','recurring_schedules',
+    'excused_exceptions','ack_alerts','employees','payroll_batches','report_configs'];
+  let ch=null, timer=null, pending=false, running=false;
+  const fieldFocused = () => { const el=document.activeElement; return !!el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName); };
+  async function sync(){
+    if(!AUTHED || !CURRENT) return;
+    const snap = await Store.loadAll();
+    if(snap){ Object.keys(snap).forEach(k=>{ DB[k]=snap[k]; }); }
+    rebuildManages(); recomputeAllApprovals(); render();
+  }
+  async function run(){
+    if(!pending || running) return;
+    if(fieldFocused()){ schedule(600); return; }   // someone's typing — wait
+    pending=false; running=true;
+    try{ await sync(); }catch(e){ console.error('live sync failed', e); }
+    finally{ running=false; if(pending) schedule(200); }
+  }
+  function schedule(ms){ pending=true; clearTimeout(timer); timer=setTimeout(run, ms||350); }
+  return {
+    start(){
+      if(!Store.enabled || ch) return;
+      ch = Store.subscribe(TABLES, ()=>schedule(), status=>{ if(status==='SUBSCRIBED') schedule(); });
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) schedule(); });
+    },
+    stop(){ if(ch){ Store.removeChannel(ch); ch=null; } clearTimeout(timer); pending=false; }
+  };
 })();
 let AUTHED = false;
 
@@ -2630,8 +2670,9 @@ async function afterAuth(){
   const el=document.getElementById('gate'); if(el) el.style.display='none';
   if(!SCREENS.find(s=>s.id===SCREEN)?.roles.includes(me().role)) SCREEN='dash';
   render();
+  Live.start();
 }
-function portalSignOut(){ if(Store.enabled){ Store.signOut(); AUTHED=false; CURRENT=null; renderLogin(); } }
+function portalSignOut(){ if(Store.enabled){ Live.stop(); Store.signOut(); AUTHED=false; CURRENT=null; renderLogin(); } }
 
 async function boot(){
   if(Store.enabled){

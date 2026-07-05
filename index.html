@@ -484,6 +484,24 @@ const Store = (() => {
     subscribe(tables,onChange){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); return ch.subscribe(); },
   };
 })();
+// Supabase query builders are lazy — they only execute when .then() is called.
+// Wrap every write method so it always fires and surfaces errors, regardless of caller.
+(function autofire(){
+  if(!Store.enabled) return;
+  const writes=['updateEmployee','addPunch','editPunch','removePunch','setSeg','clearSeg','setNote',
+    'decidePunchRequest','decidePtoRequest','addLeave','removeLeave','addOccurrence','removeOccurrence',
+    'addPremium','removePremium','addHoliday','removeHoliday','saveSchedule','removeSchedule',
+    'saveRecurring','removeRecurring','setExcused','ackAlert','audit','savePayrollBatch','reopenBatch',
+    'saveReportConfig','removeReportConfig'];
+  writes.forEach(name=>{ const orig=Store[name]; if(typeof orig!=='function') return;
+    Store[name]=function(...args){ const b=orig.apply(Store,args);
+      if(b && typeof b.then==='function'){
+        return b.then(r=>{ if(r&&r.error){ console.error(name+' failed:',r.error); try{toast('⚠ Not saved ('+name+') — '+(r.error.message||''));}catch(e){} } return r; });
+      }
+      return b;
+    };
+  });
+})();
 let AUTHED = false;
 
 /* ============================================================

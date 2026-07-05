@@ -457,7 +457,7 @@ const Store = (() => {
     addPunch(p){ return enabled ? sb.from('punches').insert({id:p.id,employee_id:p.emp,ts:p.ts,type:p.type,source:p.source||'manual',edited_by:p.editedBy}) : null; },
     editPunch(p){ return enabled ? sb.from('punches').update({ts:p.ts,type:p.type,source:'manual',edited_by:p.editedBy}).eq('id',p.id) : null; },
     removePunch(id){ return enabled ? sb.from('punches').delete().eq('id',id) : null; },
-    setSeg(inId,layer,empId,by){ return enabled ? sb.from('seg_approvals').upsert({in_punch_id:inId,layer,employee_id:empId,by_name:by}) : null; },
+    setSeg(inId,layer,empId,by){ return enabled ? sb.from('seg_approvals').upsert({in_punch_id:inId,layer,employee_id:empId,by_name:by}, {onConflict:'in_punch_id,layer'}) : null; },
     clearSeg(inId,layer){ return enabled ? sb.from('seg_approvals').delete().match({in_punch_id:inId,layer}) : null; },
     setNote(inId,empId,note,by){ return enabled ? (note ? sb.from('seg_notes').upsert({in_punch_id:inId,employee_id:empId,note,by_name:by}) : sb.from('seg_notes').delete().eq('in_punch_id',inId)) : null; },
     decidePunchRequest(id,status,by){ return enabled ? sb.from('punch_requests').update({status,decided_by:by,decided_at:new Date().toISOString()}).eq('id',id) : null; },
@@ -1360,19 +1360,20 @@ function recomputeWeekApproval(empId,weekKey){
     if(all && !a[layer]) a[layer]={by:me().name,at:now}; else if(!all && a[layer]) a[layer]=null; });
   a.locked = !!(a.employee&&a.manager&&a.hr);
 }
+function chk(p,label){ if(p&&p.then) p.then(r=>{ if(r&&r.error){ console.error(label+' failed:',r.error); toast('⚠ '+label+' not saved — '+(r.error.message||'try again')); } }); return p; }
 function toggleSeg(inId,L,empId,weekKey){
   if(!canToggleLayer(L,empId) || getApproval(empId,weekKey).locked) return;
   const k=segKey(inId,L);
-  if(DB.segApprovals[k]){ delete DB.segApprovals[k]; Store.clearSeg(inId,L); }
-  else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; Store.setSeg(inId,L,empId,me().name); }
+  if(DB.segApprovals[k]){ delete DB.segApprovals[k]; chk(Store.clearSeg(inId,L),'Unapprove'); }
+  else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; chk(Store.setSeg(inId,L,empId,me().name),'Approve'); }
   recomputeWeekApproval(empId,weekKey); render();
 }
 function checkAllSeg(empId,weekKey,L){
   if(!canToggleLayer(L,empId) || getApproval(empId,weekKey).locked) return;
   const ids=weekSegIds(empId,weekKey); const allOn=ids.length>0 && ids.every(id=>segApproved(id,L));
   ids.forEach(id=>{ const k=segKey(id,L);
-    if(allOn){ delete DB.segApprovals[k]; Store.clearSeg(id,L); }
-    else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; Store.setSeg(id,L,empId,me().name); } });
+    if(allOn){ delete DB.segApprovals[k]; chk(Store.clearSeg(id,L),'Unapprove'); }
+    else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; chk(Store.setSeg(id,L,empId,me().name),'Approve'); } });
   recomputeWeekApproval(empId,weekKey); render();
 }
 function approveAllSegs(empId,weekKey){ const now=new Date().toISOString(); weekSegIds(empId,weekKey).forEach(id=>['E','M','O'].forEach(L=>{ DB.segApprovals[segKey(id,L)]={by:me().name,at:now}; Store.setSeg(id,L,empId,me().name); })); }

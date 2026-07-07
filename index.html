@@ -415,7 +415,11 @@ tr:last-child td{border-bottom:none}
 .detail-nav .iconbtn{width:28px;height:22px;background:#eef1f7}
 .detail-who b{font-size:18px} .detail-who span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .periodbar{position:relative;display:flex;align-items:flex-end;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap;overflow:hidden}
-.periodbar::before,.hx-accent::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:12px 12px 0 0}
+.periodbar::before,.hx-accent::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#111827,#3f3f46);border-radius:12px 12px 0 0}
+.rowmenu{position:fixed;z-index:130;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 30px rgba(15,30,61,.20);padding:5px;min-width:158px;display:flex;flex-direction:column;gap:2px}
+.rowmenu button{text-align:left;background:none;border:none;padding:9px 12px;border-radius:7px;font-size:13px;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:9px}
+.rowmenu button:hover{background:#f4f6fb}
+.rowmenu button.del{color:var(--bad)} .rowmenu button.del:hover{background:var(--badbg)}
 .hx-accent{position:relative}
 .periodbar .field{min-width:120px}
 .periodbar input[type=date],.periodbar select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;width:100%}
@@ -1540,6 +1544,37 @@ function canToggleLayer(L,empId){ const u=me();
   return false;
 }
 function weekSegIds(empId,weekKey){ const ids=[]; buildTimecard(empId,weekKey).days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); DB.leave.filter(l=>l.emp===empId && sundayOf(l.date)===weekKey).forEach(l=>ids.push(l.id)); return ids; }
+
+// ----- right-click context menu on a timecard line (edit / delete whole segment) -----
+let _rowMenuEl=null;
+function closeRowMenu(){ if(_rowMenuEl){ _rowMenuEl.remove(); _rowMenuEl=null; } }
+function showRowMenu(ev, kind, empId, wk, id1, id2){
+  ev.preventDefault(); closeRowMenu();
+  const el=document.createElement('div'); el.className='rowmenu';
+  const editFn = kind==='leave' ? `editLeaveById('${id1}')` : `openPunch('${empId}','${wk}','${id1}')`;
+  const delFn  = kind==='leave' ? `deleteLeaveById('${id1}')` : `deleteSegmentDirect('${empId}','${wk}','${id1}','${id2||''}')`;
+  el.innerHTML=`<button onclick="closeRowMenu();${editFn}"><i class="ti ti-pencil"></i> Edit</button>
+    <button class="del" onclick="if(confirm('Delete this line? This removes the whole entry.')){closeRowMenu();${delFn}}else{closeRowMenu();}"><i class="ti ti-trash"></i> Delete line</button>`;
+  document.body.appendChild(el); _rowMenuEl=el;
+  el.style.left=Math.min(ev.clientX, window.innerWidth-el.offsetWidth-8)+'px';
+  el.style.top=Math.min(ev.clientY, window.innerHeight-el.offsetHeight-8)+'px';
+  setTimeout(()=>document.addEventListener('click', closeRowMenu, {once:true}), 0);
+}
+function deleteSegmentDirect(empId, wk, inId, outId){
+  if(getApproval(empId,wk).locked){ toast('Period is locked — reopen it to edit'); return; }
+  [inId,outId].filter(Boolean).forEach(id=>{ if(DB.punches.some(x=>x.id===id)){ DB.punches=DB.punches.filter(x=>x.id!==id); Store.removePunch(id); } });
+  audit('delete',empId,wk,inId,{seg:'line'},null,me().name,'Segment deleted');
+  resetWeekApprovals(empId,wk);
+  toast('Line removed'); render();
+}
+function editLeaveById(id){ const l=DB.leave.find(x=>x.id===id); if(l) openLeaveEdit(l); }
+function deleteLeaveById(id){
+  const l=DB.leave.find(x=>x.id===id); if(!l) return;
+  ['E','M','O'].forEach(L=>{ if(DB.segApprovals[segKey(id,L)]){ delete DB.segApprovals[segKey(id,L)]; chk(Store.clearSeg(id,L),'Unapprove'); } });
+  DB.leave=DB.leave.filter(x=>x.id!==id); chk(Store.removeLeave(id),'Leave');
+  recomputeWeekApproval(l.emp, sundayOf(l.date));
+  toast('Line removed'); render();
+}
 function recomputeWeekApproval(empId,weekKey){
   const ids=weekSegIds(empId,weekKey); const a=getApproval(empId,weekKey); const now=new Date().toISOString();
   ['E','M','O'].forEach(L=>{ const layer=LAYER_BY[L]; const all=ids.length>0 && ids.every(id=>segApproved(id,L));
@@ -1870,7 +1905,7 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
   const schedStart=ymd=>{ const ss=scheduleFor(empId,ymd).map(s=>s.start).sort(); return ss.length?fmt12(ss[0]):''; };
   const leaveRow=(l)=>{ const wk=sundayOf(l.date); const st=schedStart(l.date); const tin=`${dstr(l.date)}${st?' '+st:''}`; const tag=l.type.toLowerCase();
     const edit=`onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'`;
-    return `<tr class="tc-day">
+    return `<tr class="tc-day" ${editable?`oncontextmenu="showRowMenu(event,'leave','${l.emp}','','${l.id}','')"`:''}>
       <td></td>
       <td class="apcol">${box(l.id,'E',wk)}</td><td class="apcol">${box(l.id,'M',wk)}</td><td class="apcol">${box(l.id,'O',wk)}</td>
       <td><span class="ltag ${tag}" onclick="showLeaveNote('${l.id}')" title="View note">${l.type}</span></td>
@@ -1917,7 +1952,7 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
       const showWeek = last && d.isWeekEnd;
       const inCell=`${fmtDT(s.in,e)}${s.issue?` <i class="ti ti-alert-triangle" style="color:var(--bad);font-size:11px" title="${s.issue}"></i>`:''}`;
       const outCell=s.issue&&s.out===s.in?`<span style="color:var(--bad)">${s.issue}</span>`:(s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>');
-      body+=`<tr class="${si===0?'tc-day':''}">
+      body+=`<tr class="${si===0?'tc-day':''}" ${editable?`oncontextmenu="showRowMenu(event,'punch','${empId}','${d.weekKey}','${s.inId}','${s.outId||''}')"`:''}>
         <td>${dayExc?`<span class="dot" title="${d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).join('; ')}"></span>`:''}</td>
         <td class="apcol">${box(s.inId,'E',d.weekKey)}</td><td class="apcol">${box(s.inId,'M',d.weekKey)}</td><td class="apcol">${box(s.inId,'O',d.weekKey)}</td>
         <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WS Display · Timekeeping</title>
+<title>WS Time</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -14,10 +14,20 @@
   --bg:#f4f6fb; --card:#ffffff; --line:#e5e9f2; --ink:#0f1e3d; --muted:#6b7896;
   --ok:#16a34a; --okbg:#dcfce7; --warn:#d97706; --warnbg:#fef3c7; --bad:#dc2626; --badbg:#fee2e2;
   --grad:linear-gradient(135deg,#0f1e3d 0%,#1b3a6b 55%,#2563eb 100%);
+  --grad-hero:linear-gradient(100deg,#13233f 0%,#213f63 26%,#31608f 52%,#4a86bd 78%,#68a6d8 100%);
+  --cyan:#2dd4bf;
+  --shadow:0 1px 2px rgba(15,30,61,.05), 0 6px 18px rgba(15,30,61,.06);
+  --shadow-hero:0 14px 34px rgba(37,99,235,.30);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:radial-gradient(1100px 460px at 100% -8%, rgba(96,165,250,.18), transparent 60%), radial-gradient(820px 400px at -6% 2%, rgba(37,99,235,.10), transparent 55%), var(--bg);background-attachment:fixed;color:var(--ink);font-size:14px;line-height:1.5}
 button{font-family:inherit;cursor:pointer;border:none}
+.page-fx{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.pspot{position:absolute;border-radius:50%;filter:blur(8px);background:radial-gradient(circle at 50% 50%, rgba(59,130,246,.16), rgba(59,130,246,0) 70%);animation-name:pageDrift;animation-timing-function:ease-in-out;animation-iteration-count:infinite;will-change:transform}
+.pspot.t{background:radial-gradient(circle at 50% 50%, rgba(45,212,191,.13), rgba(45,212,191,0) 70%)}
+@keyframes pageDrift{0%{transform:translate(0,0)}50%{transform:translate(42px,-32px)}100%{transform:translate(0,0)}}
+@keyframes pageDrift2{0%{transform:translate(0,0)}50%{transform:translate(-38px,30px)}100%{transform:translate(0,0)}}
+@media (prefers-reduced-motion: reduce){.pspot{animation:none}}
 input,select{font-family:inherit;font-size:14px}
 
 /* Layout */
@@ -70,7 +80,7 @@ input,select{font-family:inherit;font-size:14px}
 .pagehead p{color:var(--muted);font-size:13px;margin-top:3px}
 
 /* Cards */
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow)}
 .card h2{font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
 .card h2 i{color:var(--accent);font-size:19px}
 
@@ -175,20 +185,30 @@ tr:last-child td{border-bottom:none}
 .navitem{position:relative}
 
 /* Dashboard hero */
-.hero{background:var(--grad);border-radius:16px;padding:26px 28px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;overflow:hidden;position:relative}
-.hero-eyebrow{font-size:11px;letter-spacing:1.4px;opacity:.7;font-weight:600;margin-bottom:6px}
-.hero-txt h2{font-size:26px;font-weight:700;margin-bottom:4px}
-.hero-txt p{opacity:.82;font-size:14px}
+.hero{background:var(--grad-hero);border-radius:18px;padding:28px 30px;color:#fff;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;overflow:hidden;position:relative;box-shadow:var(--shadow-hero)}
+.hero::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(102deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.10) 49%, rgba(255,255,255,0) 64%), radial-gradient(620px 240px at 90% -30%, rgba(255,255,255,.16), transparent 62%)}
+.hero-spot{position:absolute;z-index:0;border-radius:50%;pointer-events:none;background:radial-gradient(circle at 50% 50%, rgba(222,238,255,.55), rgba(222,238,255,0) 70%);filter:blur(3px);animation-name:heroDrift;animation-timing-function:ease-in-out;animation-iteration-count:infinite;will-change:transform,opacity}
+@keyframes heroDrift{0%{transform:translate(0,0) scale(1);opacity:.38}50%{transform:translate(16px,-12px) scale(1.16);opacity:.8}100%{transform:translate(0,0) scale(1);opacity:.38}}
+@keyframes heroDrift2{0%{transform:translate(0,0) scale(1);opacity:.28}50%{transform:translate(-15px,11px) scale(1.1);opacity:.62}100%{transform:translate(0,0) scale(1);opacity:.28}}
+@media (prefers-reduced-motion: reduce){.hero-spot{animation:none}}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:1.5px;font-weight:700;color:var(--cyan);text-transform:uppercase;margin-bottom:9px}
+.hero-eyebrow .livedot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 0 rgba(45,212,191,.55);animation:livepulse 2.2s infinite}
+@keyframes livepulse{0%{box-shadow:0 0 0 0 rgba(45,212,191,.5)}70%{box-shadow:0 0 0 8px rgba(45,212,191,0)}100%{box-shadow:0 0 0 0 rgba(45,212,191,0)}}
+.hero-name{color:var(--cyan)}
+.hero-txt{position:relative;z-index:1}
+.hero-txt h2{font-size:30px;font-weight:800;margin-bottom:5px;letter-spacing:-.4px;text-shadow:0 2px 14px rgba(8,20,50,.28)}
+.hero-txt p{opacity:.9;font-size:14.5px}
 .hero-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
-.hero-cta{background:#fff;color:var(--navy)}
-.hero-cta:hover{opacity:.92}
-.hero-cta.ghost{background:rgba(255,255,255,.14);color:#fff}
-.hero-badge{font-size:80px;opacity:.13;position:absolute;right:26px;top:50%;transform:translateY(-50%)}
+.hero-cta{background:#fff;color:var(--accent);font-weight:700;box-shadow:0 6px 16px rgba(8,20,50,.18);transition:transform .16s ease, box-shadow .16s ease}
+.hero-cta:hover{transform:translateY(-1px);box-shadow:0 9px 20px rgba(8,20,50,.24)}
+.hero-cta.ghost{background:rgba(255,255,255,.16);color:#fff;box-shadow:none}
+.hero-cta.ghost:hover{background:rgba(255,255,255,.26)}
+.hero-badge{font-size:96px;opacity:.16;position:absolute;right:22px;top:50%;transform:translateY(-50%);z-index:0}
 
 /* KPI cards */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
 @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
 .kpi-ic{width:34px;height:34px;border-radius:9px;background:#eef2ff;color:var(--accent);display:grid;place-items:center;font-size:19px;margin-bottom:10px}
 .kpi.ok .kpi-ic{background:var(--okbg);color:var(--ok)} .kpi.warn .kpi-ic{background:var(--warnbg);color:var(--warn)}
 .kpi.bad .kpi-ic{background:var(--badbg);color:var(--bad)} .kpi.neutral .kpi-ic{background:#eef1f7;color:var(--muted)}
@@ -222,12 +242,21 @@ tr:last-child td{border-bottom:none}
 .wboard{columns:3;column-gap:18px}
 @media(max-width:1050px){.wboard{columns:2}}
 @media(max-width:720px){.wboard{columns:1}}
-.widget{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0;margin:0 0 18px;break-inside:avoid;display:inline-block;width:100%;overflow:hidden}
-.whead{display:flex;justify-content:space-between;align-items:center;padding:15px 16px 12px;border-bottom:1px solid var(--line)}
-.wtitle{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600}
-.wic{width:28px;height:28px;border-radius:8px;background:#eef2ff;color:var(--accent);display:grid;place-items:center;font-size:17px}
-.wcount{font-size:22px;font-weight:700;color:var(--navy)}
-.wcount.warn{color:var(--warn)} .wcount.bad{color:var(--bad)} .wcount.ok{color:var(--ok)}
+.widget{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:0;margin:0 0 18px;break-inside:avoid;display:inline-block;width:100%;overflow:hidden;box-shadow:var(--shadow);transition:box-shadow .18s ease}
+.widget:hover{box-shadow:0 4px 14px rgba(15,30,61,.09), 0 14px 34px rgba(15,30,61,.09)}
+.widget::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;z-index:1;background:linear-gradient(90deg,#2563eb,#60a5fa)}
+.whead{display:flex;justify-content:space-between;align-items:center;padding:16px 16px 13px;border-bottom:1px solid var(--line)}
+.wtitle{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:var(--navy);letter-spacing:-.2px}
+.wic{width:32px;height:32px;border-radius:10px;color:#fff;display:grid;place-items:center;font-size:18px}
+.wcount{font-size:19px;font-weight:800;border-radius:9px;padding:2px 11px;line-height:1.5}
+.w-blue::before{background:linear-gradient(90deg,#2563eb,#60a5fa)} .w-blue .whead{background:linear-gradient(180deg,#eef4ff,#fff)} .w-blue .wic{background:linear-gradient(135deg,#2563eb,#3b82f6);box-shadow:0 3px 8px rgba(37,99,235,.30)} .w-blue .wcount{color:#1d4ed8;background:#e7effc}
+.w-green::before{background:linear-gradient(90deg,#16a34a,#4ade80)} .w-green .whead{background:linear-gradient(180deg,#eafaf0,#fff)} .w-green .wic{background:linear-gradient(135deg,#15a34a,#22c55e);box-shadow:0 3px 8px rgba(22,163,74,.28)} .w-green .wcount{color:#15803d;background:#dcfce7}
+.w-amber::before{background:linear-gradient(90deg,#d97706,#fbbf24)} .w-amber .whead{background:linear-gradient(180deg,#fdf4e3,#fff)} .w-amber .wic{background:linear-gradient(135deg,#d97706,#f59e0b);box-shadow:0 3px 8px rgba(217,119,6,.28)} .w-amber .wcount{color:#b45309;background:#fef3c7}
+.w-purple::before{background:linear-gradient(90deg,#7c3aed,#a78bfa)} .w-purple .whead{background:linear-gradient(180deg,#f3effe,#fff)} .w-purple .wic{background:linear-gradient(135deg,#7c3aed,#8b5cf6);box-shadow:0 3px 8px rgba(124,58,237,.28)} .w-purple .wcount{color:#6d28d9;background:#ede9fe}
+.w-teal::before{background:linear-gradient(90deg,#0d9488,#2dd4bf)} .w-teal .whead{background:linear-gradient(180deg,#e6faf6,#fff)} .w-teal .wic{background:linear-gradient(135deg,#0d9488,#14b8a6);box-shadow:0 3px 8px rgba(13,148,136,.28)} .w-teal .wcount{color:#0f766e;background:#ccfbf1}
+.w-pink::before{background:linear-gradient(90deg,#db2777,#f472b6)} .w-pink .whead{background:linear-gradient(180deg,#fdeef6,#fff)} .w-pink .wic{background:linear-gradient(135deg,#db2777,#ec4899);box-shadow:0 3px 8px rgba(219,39,119,.28)} .w-pink .wcount{color:#be185d;background:#fce7f3}
+.w-cyan::before{background:linear-gradient(90deg,#0891b2,#22d3ee)} .w-cyan .whead{background:linear-gradient(180deg,#e7f9fd,#fff)} .w-cyan .wic{background:linear-gradient(135deg,#0891b2,#06b6d4);box-shadow:0 3px 8px rgba(8,145,178,.28)} .w-cyan .wcount{color:#0e7490;background:#cffafe}
+.w-red::before{background:linear-gradient(90deg,#dc2626,#fb7185)} .w-red .whead{background:linear-gradient(180deg,#fdeeee,#fff)} .w-red .wic{background:linear-gradient(135deg,#dc2626,#ef4444);box-shadow:0 3px 8px rgba(220,38,38,.28)} .w-red .wcount{color:#b91c1c;background:#fee2e2}
 .wbody{padding:6px 16px;max-height:280px;overflow-y:auto}
 .wfoot{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
 .wtable{font-size:12.5px}
@@ -335,9 +364,13 @@ tr:last-child td{border-bottom:none}
 .toggle.on span{left:18px}
 
 /* Segment timecard (Namely-style) */
-.tcard{width:100%;border-collapse:collapse;font-size:12.5px;min-width:820px}
-.tcard th{padding:8px 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:2px solid var(--line);text-align:left;white-space:nowrap}
-.tcard td{padding:7px 8px;border-bottom:1px solid #eef1f7;white-space:nowrap}
+.tcard{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
+.tcard th{padding:10px 11px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--navy);font-weight:700;border-bottom:2px solid var(--line);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard td{padding:10px 11px;border-bottom:1px solid #eef1f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard tbody tr:nth-child(even) td{background:#f5f7fb}
+.tcard th.num,.tcard td.num{text-align:center}
+.ltag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:6px;cursor:pointer;text-transform:uppercase}
+.ltag.pto{color:#1d4ed8;background:#e7effc} .ltag.sick{color:#b45309;background:#fef3c7} .ltag.holiday{color:#0f766e;background:#ccfbf1} .ltag.bereavement{color:#6d28d9;background:#ede9fe}
 .tcard tr.tc-day td{border-top:1px solid var(--line)}
 .tcard .apcol{text-align:center;width:34px}
 .tcard th.apcol{font-size:13px;font-weight:700;color:var(--navy)}
@@ -345,9 +378,8 @@ tr:last-child td{border-bottom:none}
 .tcard th.apcol.clickable:hover{background:#eef2ff}
 .tcard input[type=checkbox]{width:16px;height:16px;accent-color:var(--ok);cursor:pointer}
 .tcard .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad)}
-.tcard tr.tc-leave td{background:#fbfbff}
-.leavetag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#5b6bb8;background:#eef1ff;border:1px solid #dbe4ff;border-radius:6px;padding:2px 6px}
-.leavetag.hol{color:#a86800;background:#fff6df;border-color:#f0e3b8}
+.tcard .edcol{text-align:center;width:52px} .tcard td.edcol b{color:var(--accent);font-weight:800}
+.tcard .phcol{text-align:center;width:54px;color:#c7d0e0}
 .tcard .brk{color:var(--muted);font-variant-numeric:tabular-nums}
 .tcard .tin b{color:var(--navy)}
 .tcard .editcell{cursor:pointer}
@@ -358,7 +390,7 @@ tr:last-child td{border-bottom:none}
 .tc-flags{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 
 /* Dashboard meta strip (under hero) */
-.dash-meta{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.dash-meta{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:12.5px;color:var(--muted);flex-wrap:wrap;box-shadow:var(--shadow)}
 .dash-meta b{color:var(--navy);font-weight:600;margin-right:4px}
 .ackbtn{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px;background:#eef1f7;color:var(--muted)}
 .ackbtn:hover{background:var(--ok);color:#fff}
@@ -382,7 +414,9 @@ tr:last-child td{border-bottom:none}
 .detail-nav{display:flex;flex-direction:column;gap:3px}
 .detail-nav .iconbtn{width:28px;height:22px;background:#eef1f7}
 .detail-who b{font-size:18px} .detail-who span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.periodbar{display:flex;align-items:flex-end;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap}
+.periodbar{position:relative;display:flex;align-items:flex-end;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;flex-wrap:wrap;overflow:hidden}
+.periodbar::before,.hx-accent::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:12px 12px 0 0}
+.hx-accent{position:relative}
 .periodbar .field{min-width:120px}
 .periodbar input[type=date],.periodbar select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;width:100%}
 .totalsbar{display:flex;gap:8px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -417,15 +451,23 @@ tr:last-child td{border-bottom:none}
 </style>
 </head>
 <body>
+<div class="page-fx" aria-hidden="true">
+  <span class="pspot" style="width:340px;height:340px;left:6%;top:12%;animation-duration:34s"></span>
+  <span class="pspot t" style="width:240px;height:240px;left:78%;top:8%;animation-duration:42s;animation-delay:-8s;animation-name:pageDrift2"></span>
+  <span class="pspot" style="width:300px;height:300px;left:60%;top:48%;animation-duration:38s;animation-delay:-14s"></span>
+  <span class="pspot t" style="width:200px;height:200px;left:14%;top:66%;animation-duration:46s;animation-delay:-6s;animation-name:pageDrift2"></span>
+  <span class="pspot" style="width:260px;height:260px;left:40%;top:82%;animation-duration:40s;animation-delay:-20s"></span>
+  <span class="pspot" style="width:180px;height:180px;left:90%;top:70%;animation-duration:36s;animation-delay:-12s;animation-name:pageDrift2"></span>
+</div>
 <div class="apptop">
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
-  <div class="apptop-brand"><span class="tlogo"><i class="ti ti-clock-hour-4"></i></span>Timekeeping <span>WS Display · HR</span></div>
+  <div class="apptop-brand"><span class="tlogo"><i class="ti ti-clock-hour-4"></i></span>WS Time</div>
 </div>
 <div class="app">
   <aside class="side">
     <div class="brand">
       <div class="logo"><i class="ti ti-clock-hour-4"></i></div>
-      <div style="flex:1"><b>Timekeeping</b><span>WS Display · HR</span></div>
+      <div style="flex:1"><b>WS Time</b><span>WS Display · HR</span></div>
       <button class="drawer-close" onclick="toggleSidebar(false)" aria-label="Close"><i class="ti ti-x"></i></button>
     </div>
     <nav class="nav" id="nav"></nav>
@@ -1214,6 +1256,7 @@ function render(){
   else if(PEDIT) renderPremiumModal();
   else if(HEDIT) renderHolidayModal();
   else if(NEDIT) renderNoteModal();
+  else if(LNOTE) renderLeaveNoteModal();
   else if(PUNCH) renderPunchModal();
   else if(PAYVIEW) renderPayModal();
   else { host.innerHTML=''; host.classList.remove('show'); }
@@ -1306,11 +1349,12 @@ function kpi(icon,label,value,sub,tone){
   return `<div class="kpi ${tone||''}"><div class="kpi-ic"><i class="ti ${icon}"></i></div>
     <div class="kpi-val">${value}</div><div class="kpi-lbl">${label}</div>${sub?`<div class="kpi-sub">${sub}</div>`:''}</div>`;
 }
-function widget(icon,title,count,body,jump,countTone){
-  return `<div class="widget">
+function widget(icon,title,count,body,jump,countTone,theme){
+  const th=theme||'blue';
+  return `<div class="widget w-${th}">
     <div class="whead">
       <div class="wtitle"><span class="wic"><i class="ti ${icon}"></i></span>${title}</div>
-      ${(count!==undefined&&count!=='')?`<div class="wcount ${countTone||''}">${count}</div>`:''}
+      ${(count!==undefined&&count!=='')?`<div class="wcount">${count}</div>`:''}
     </div>
     <div class="wbody">${body}</div>
     ${jump?`<div class="wfoot"><button class="btn ghost sm" onclick="nav('${jump.screen}')">${jump.label} <i class="ti ti-arrow-right"></i></button></div>`:''}
@@ -1345,19 +1389,22 @@ function viewDash(){
 
   const hero = `
   <div class="hero">
+    <span class="hero-spot" style="width:130px;height:130px;left:10%;top:20%;animation-duration:13s"></span>
+    <span class="hero-spot" style="width:70px;height:70px;left:33%;top:64%;animation-duration:17s;animation-delay:-5s;animation-name:heroDrift2"></span>
+    <span class="hero-spot" style="width:180px;height:180px;left:66%;top:8%;animation-duration:21s;animation-delay:-9s"></span>
+    <span class="hero-spot" style="width:54px;height:54px;left:82%;top:62%;animation-duration:15s;animation-delay:-3s;animation-name:heroDrift2"></span>
+    <span class="hero-spot" style="width:44px;height:44px;left:50%;top:28%;animation-duration:11s;animation-delay:-6s"></span>
     <div class="hero-txt">
-      <div class="hero-eyebrow">${u.role.toUpperCase()} · ${TZ[u.tz]}</div>
-      <h2>${greet}, ${first}</h2>
+      <div class="hero-eyebrow"><span class="livedot"></span>${new Intl.DateTimeFormat('en-US',{timeZone:u.tz,weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(new Date())}</div>
+      <h2>${greet}, <span class="hero-name">${first}</span></h2>
       <p>${u.role==='employee'?"Here's your week at a glance.":`You're overseeing ${scope.length} ${scope.length===1?'employee':'employees'} this pay period.`}</p>
       <div class="hero-actions">${cta}</div>
     </div>
     <div class="hero-badge"><i class="ti ti-clock-hour-4"></i></div>
   </div>
   <div class="dash-meta">
-    <span><b>Company</b> WS Display</span>
     <span><b>Pay week</b> ${weekLabel(wk)}</span>
     <span><b>${scope.length}</b> ${scope.length===1?'employee':'employees'} in view</span>
-    <span style="margin-left:auto">${today}</span>
   </div>`;
 
   /* ---- EMPLOYEE: focused personal view ---- */
@@ -1385,37 +1432,32 @@ function viewDash(){
     </div>`;
   }
 
-  /* ---- MANAGER / HR: Namely-style widget board ---- */
-  const stM={out:['Out','neutral'],in:['Clocked In','ok'],meal:['On meal','warn'],break:['On break','warn']};
-  const statuses=scope.map(e=>({e,s:empStatus(e.id)}));
-  const clockedIn=statuses.filter(x=>x.s!=='out').length;
-  const wStatus = widget('ti-users','Employee Status',clockedIn,
-    `<table class="wtable"><thead><tr><th>Name</th><th>ID</th><th>Clock status</th></tr></thead><tbody>
-      ${statuses.map(({e,s})=>`<tr><td>${e.name}</td><td>${e.empId||'—'}</td><td><span class="pill ${stM[s][1]}">${stM[s][0]}</span></td></tr>`).join('')}
-    </tbody></table>`);
-
-  const otList=scope.map(e=>{const tc=buildTimecard(e.id,currentWeekKey(e));const rule=ruleFor(e);
-      const over=tc.ot+tc.dt; const remain=rule.weekly-tc.total; return {e,tc,over,remain};})
-    .filter(x=>x.over>0 || (x.remain<=8 && x.tc.total>0)).sort((a,b)=>b.over-a.over);
-  const wOT = widget('ti-flame','Approaching Overtime',otList.length,
-    otList.length? `<table class="wtable"><thead><tr><th>Name</th><th>Status</th></tr></thead><tbody>
-      ${otList.map(x=>`<tr><td>${x.e.name}</td><td>${x.over>0?`<span style="color:var(--bad);font-weight:600">${h2(x.over)} into OT</span>`:`<span style="color:var(--warn)">${h2(x.remain)} to OT</span>`}</td></tr>`).join('')}
-    </tbody></table>` : `<div class="empty">Nobody near overtime.</div>`,
-    null, otList.some(x=>x.over>0)?'bad':'warn');
-
-  const wReq = widget('ti-message-report','Correction Requests',reqs.length,
-    reqs.length? reqs.map(r=>`<div class="wrow"><div><b>${emp(r.emp).name}</b><div class="listsub">${reqDesc(r)} · "${r.note}"</div></div>
-      <div class="wactions"><button class="iconbtn ok" title="Apply" onclick="applyRequest('${r.id}')"><i class="ti ti-check"></i></button>
-      <button class="iconbtn bad" title="Decline" onclick="declineRequest('${r.id}')"><i class="ti ti-x"></i></button></div></div>`).join('')
-      : `<div class="empty">No open requests.</div>`,
-    {screen:'hours',label:'Jump to Hours'}, reqs.length?'warn':'');
-
+  /* ---- MANAGER / HR: focused widget board ---- */
+  // one pass per employee → hours by location + overtime by department (this week)
   const locC={CA:'#16a34a',PA:'#3b82f6'};
-  const byLoc={}; scope.forEach(e=>{byLoc[e.loc]=(byLoc[e.loc]||0)+buildTimecard(e.id,currentWeekKey(e)).total;});
+  const byLoc={}; const otByDept={};
+  scope.forEach(e=>{ const tc=buildTimecard(e.id,currentWeekKey(e));
+    byLoc[e.loc]=(byLoc[e.loc]||0)+tc.total;
+    const ot=tc.ot+tc.dt; if(ot>0) otByDept[e.dept]=(otByDept[e.dept]||0)+ot;
+  });
+
   const segs=Object.entries(byLoc).filter(([k,v])=>v>0).map(([k,v])=>({label:k,val:v,color:locC[k]||'#94a3b8'}));
   const totalH=segs.reduce((s,x)=>s+x.val,0);
   const wHours = widget('ti-chart-donut','Hours by Location',h2(totalH),
-    donut(segs, `<b>${h2(totalH)}</b><span>hrs</span>`));
+    donut(segs, `<b>${h2(totalH)}</b><span>hrs</span>`), null, '', 'blue');
+
+  const otDeptRows=Object.entries(otByDept).sort((a,b)=>b[1]-a[1]);
+  const otDeptTot=otDeptRows.reduce((s,r)=>s+r[1],0);
+  const otDeptMax=Math.max(1,...otDeptRows.map(r=>r[1]));
+  const wOTDept = widget('ti-flame','Overtime by Department', h2(otDeptTot),
+    otDeptRows.length? `<div style="display:flex;flex-direction:column;gap:9px">
+      ${otDeptRows.map(([d,v])=>`<div style="display:flex;align-items:center;gap:10px">
+        <span style="width:120px;font-size:12px;color:var(--navy);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${d}">${d}</span>
+        <div style="flex:1;height:9px;background:#eef1f7;border-radius:6px;overflow:hidden"><div style="width:${Math.round(v/otDeptMax*100)}%;height:100%;background:var(--warn)"></div></div>
+        <span style="font-size:12px;font-variant-numeric:tabular-nums;font-weight:700;color:var(--warn);min-width:44px;text-align:right">${h2(v)}</span>
+      </div>`).join('')}
+    </div>` : `<div class="empty">No overtime this week.</div>`,
+    null, '', 'amber');
 
   const appr=scope.map(e=>getApproval(e.id,currentWeekKey(e)));
   const approved=appr.filter(a=>a.locked).length; const totalCards=appr.length||1;
@@ -1424,35 +1466,14 @@ function viewDash(){
     `<div class="stack"><div class="seg ok" style="width:${pct}%"></div><div class="seg warn" style="width:${100-pct}%"></div></div>
      <div class="stackleg"><span><span class="legdot" style="background:var(--ok)"></span> Approved · ${approved}</span>
        <span><span class="legdot" style="background:var(--warn)"></span> Unapproved · ${appr.length-approved}</span></div>
-     <div class="hint" style="margin-top:8px">${pct}% of timecards fully signed off this week.</div>`);
-
-  const wExc = widget('ti-alert-triangle','Clock Exceptions',excRows.length,
-    excRows.length? `<table class="wtable"><thead><tr><th>Name</th><th>Type</th><th>Day</th></tr></thead><tbody>
-      ${excRows.map(({e,d})=>{const dt=new Date(d.ymd+'T00:00:00Z');
-        return `<tr><td>${e.name}</td><td style="color:var(--bad)">${d.exceptions.join(', ')}</td><td>${dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}</td></tr>`;}).join('')}
-    </tbody></table>` : `<div class="empty">No exceptions flagged.</div>`,
-    {screen:'hours',label:'Jump to Hours'}, excRows.length?'bad':'');
-
-  const wNeed = widget('ti-checklist',u.role==='hr'?'Awaiting HR Approval':'Awaiting My Approval',approvals.length,
-    approvals.length? approvals.map(({e,wk})=>{const tc=buildTimecard(e.id,wk);
-      return `<div class="wrow" onclick="nav('hours')" style="cursor:pointer"><div><b>${e.name}</b>
-        <div class="listsub">${h2(tc.total)} hrs${tc.anyExc?' · <span style="color:var(--bad)">exceptions</span>':''}</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--muted)"></i></div>`;}).join('')
-      : `<div class="empty">All caught up.</div>`,
-    {screen:'hours',label:'Review in Hours'}, approvals.length?'warn':'');
+     <div class="hint" style="margin-top:8px">${pct}% of timecards fully signed off this week.</div>`, null, '', 'green');
 
   const attList=scope.map(e=>({e,pts:rollingPoints(e.id)})).filter(x=>x.pts>0).sort((a,b)=>b.pts-a.pts);
   const wAtt = widget('ti-calendar-stats','Attendance Points',attList.length,
     attList.length? `<table class="wtable"><thead><tr><th>Name</th><th class="num">Pts</th><th>Standing</th></tr></thead><tbody>
       ${attList.map(x=>{const t=disciplineTier(x.pts);return `<tr><td>${x.e.name}</td><td class="num">${x.pts}</td><td><span class="pill ${t.tone}">${t.label}</span></td></tr>`;}).join('')}
     </tbody></table>` : `<div class="empty">No active attendance points.</div>`,
-    {screen:'hours',label:'Open Hours'}, attList.some(x=>x.pts>=6)?'bad':'');
-
-  const myAlerts=alertsFor(u);
-  const wAlert = widget('ti-bell','Alerts',myAlerts.length,
-    myAlerts.length? myAlerts.slice(0,8).map(a=>`<div class="wrow"><div><b>${emp(a.emp).name}</b><div class="listsub">${a.msg}</div></div><span class="pill ${a.type==='tier'?'bad':a.type==='premium'?'ok':'warn'}">${a.type}</span></div>`).join('')
-      : `<div class="empty">No alerts.</div>`,
-    {screen:'notify',label:'Open Notifications'}, myAlerts.some(a=>a.type==='tier'||a.type==='approval')?'bad':'warn');
+    {screen:'hours',label:'Open Hours'}, '', 'purple');
 
   // --- Premiums report: all employees, LAST pay period (the one being paid out) ---
   const ppStart=ymdAdd(payPeriodStart(todayYmd(u)),-14), ppStop=ymdAdd(ppStart,13);
@@ -1470,9 +1491,9 @@ function viewDash(){
       ${manualEntries.map(({e,p})=>`<div class="wrow"><div><b>${e.name}</b><div class="listsub">${p.reason} · ${md(p.date)} · ${h2(p.hours)}</div></div>${me().role==='hr'?`<button class="excuse-btn" onclick="deletePremium('${p.id}')">delete</button>`:''}</div>`).join('')}`
       : `<div class="hint" style="margin-top:10px">No manual premiums — add per employee via Hours → Add entry → Premium.</div>`}`
       : `<div class="empty">No premiums for the period being paid out.</div>`}`,
-    {screen:'hours',label:'Open Hours'}, premGrand>0?'ok':'');
+    {screen:'hours',label:'Open Hours'}, '', 'teal');
 
-  return hero + `<div class="wboard">${wStatus}${wAlert}${wOT}${wNeed}${wAtt}${wPrem}${wHours}${wReq}${wAppr}${wExc}</div>`;
+  return hero + `<div class="wboard">${wAtt}${wAppr}${wHours}${wOTDept}${wPrem}</div>`;
 }
 
 /* ---------- PUNCH STATUS (fed by biometric clock + external web clock) ---------- */
@@ -1488,7 +1509,7 @@ function empStatus(empId){
 function labelType(t){return {in:'Clock In',out:'Clock Out',meal_start:'Meal start',meal_end:'Meal end',break_start:'Break start',break_end:'Break end'}[t]||t;}
 
 /* ---------- TIMECARD (shared renderer) ---------- */
-function h2(n){ const h=Math.floor(n); const m=Math.round((n-h)*60); return `${h}:${String(m).padStart(2,'0')}`; }
+function h2(n){ let h=Math.floor(n); let m=Math.round((n-h)*60); if(m>=60){ h+=1; m-=60; } return `${h}:${String(m).padStart(2,'0')}`; }
 /* ---- segment engine + per-row E/M/O approval + segment notes ---- */
 const LAYER_BY={E:'employee',M:'manager',O:'hr'};
 function daySegments(punches){
@@ -1518,7 +1539,7 @@ function canToggleLayer(L,empId){ const u=me();
   if(u.role==='manager' && L==='M' && u.manages?.includes(empId)) return true;
   return false;
 }
-function weekSegIds(empId,weekKey){ const ids=[]; buildTimecard(empId,weekKey).days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); return ids; }
+function weekSegIds(empId,weekKey){ const ids=[]; buildTimecard(empId,weekKey).days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); DB.leave.filter(l=>l.emp===empId && sundayOf(l.date)===weekKey).forEach(l=>ids.push(l.id)); return ids; }
 function recomputeWeekApproval(empId,weekKey){
   const ids=weekSegIds(empId,weekKey); const a=getApproval(empId,weekKey); const now=new Date().toISOString();
   ['E','M','O'].forEach(L=>{ const layer=LAYER_BY[L]; const all=ids.length>0 && ids.every(id=>segApproved(id,L));
@@ -1587,6 +1608,7 @@ function saveLeaveEntry(){
   if(!(PUNCH.hours>0)){ toast('Enter hours'); return; }
   const l={id:'lv'+Date.now()+Math.random().toString(36).slice(2,5), emp:PUNCH.empId, date:PUNCH.ymd, type:PUNCH.leaveType, hours:PUNCH.hours, note:PUNCH.note||''};
   DB.leave.push(l); chk(Store.addLeave(l),'Leave');
+  recomputeWeekApproval(l.emp, sundayOf(l.date));
   PUNCH=null; toast(`${l.type} added (${h2(l.hours)})`); render();
 }
 function savePremiumEntry(){
@@ -1676,6 +1698,27 @@ function renderNoteModal(){
     <div class="modalbody"><div class="field"><label>Note</label>
       <input value="${(NEDIT.text||'').replace(/"/g,'&quot;')}" oninput="NEDIT.text=this.value" placeholder="e.g. Approved early departure"></div></div>
     <div class="modalfoot"><button class="btn ghost" onclick="closeSegNote()">Cancel</button><button class="btn primary" onclick="saveSegNote()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+
+let LNOTE=null;
+function showLeaveNote(id){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;PUNCH=null; LNOTE=DB.leave.find(l=>l.id===id)||null; render(); }
+function closeLeaveNote(){ LNOTE=null; render(); }
+function editLeaveFromNote(){ const l=LNOTE; LNOTE=null; if(l) openLeaveEdit(l); }
+function renderLeaveNoteModal(){
+  const host=document.getElementById('modal'); const l=LNOTE; if(!l){ host.innerHTML=''; host.classList.remove('show'); return; }
+  const e=emp(l.emp); const dt=ymdD(l.date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric',timeZone:'UTC'});
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>Timesheet entry</b><div class="hint">${e.name}</div></div>
+    <button class="btn ghost sm" onclick="closeLeaveNote()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fbfcfe">
+        <div style="font-size:17px;font-weight:700;color:var(--navy)">${l.type} · ${h2(l.hours)} hrs</div>
+        <div class="hint" style="margin-top:3px">${dt}</div>
+        ${l.note?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">${l.note}</div>`:''}
+      </div>
+    </div>
+    <div class="modalfoot">${can('edit',l.emp)?`<button class="btn ghost" onclick="editLeaveFromNote()"><i class="ti ti-pencil"></i> Edit entry</button>`:''}
+      <button class="btn primary" onclick="closeLeaveNote()">Close</button></div></div>`;
   host.classList.add('show');
 }
 
@@ -1781,12 +1824,12 @@ function periodTimecard(empId, start, stop){
   days.forEach((d,i)=>{ d.isWeekEnd = lastByWeek[d.weekKey]===i; });
   return {e, days, reg, ot, dt, total, weekKeys};
 }
-function periodSegIds(days){ const ids=[]; days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); return ids; }
+function periodSegIds(days, empId, start, stop){ const ids=[]; days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); if(empId&&start&&stop) DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>ids.push(l.id)); return ids; }
 function periodLocked(empId, weekKeys){ return weekKeys.length>0 && weekKeys.every(wk=>getApproval(empId,wk).locked); }
 function checkAllSegPeriod(empId,start,stop,L){
   if(!canToggleLayer(L,empId)) return;
   const tc=periodTimecard(empId,start,stop); if(periodLocked(empId,tc.weekKeys)) return;
-  const ids=periodSegIds(tc.days); const allOn=ids.length>0 && ids.every(id=>segApproved(id,L));
+  const ids=periodSegIds(tc.days, empId, start, stop); const allOn=ids.length>0 && ids.every(id=>segApproved(id,L));
   ids.forEach(id=>{ const k=segKey(id,L);
     if(allOn){ delete DB.segApprovals[k]; chk(Store.clearSeg(id,L),'Unapprove'); }
     else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; chk(Store.setSeg(id,L,empId,me().name),'Approve'); } });
@@ -1811,7 +1854,7 @@ function togglePeriodHist(empId,start,stop){
 function renderPeriodTimecard(empId, start, stop, viewerLayer){
   const tc=periodTimecard(empId,start,stop); const e=tc.e;
   const locked=periodLocked(empId,tc.weekKeys);
-  const ids=periodSegIds(tc.days);
+  const ids=periodSegIds(tc.days, empId, start, stop);
   const allChk = L => ids.length>0 && ids.every(id=>segApproved(id,L));
   const box = (inId,L,wk) => `<input type="checkbox" ${segApproved(inId,L)?'checked':''} ${(canToggleLayer(L,empId)&&!locked)?'':'disabled'} onchange="toggleSeg('${inId}','${L}','${empId}','${wk}')">`;
   const hdr = (L,lbl) => { const on=canToggleLayer(L,empId)&&!locked; return `<th class="apcol ${on?'clickable':''}" ${on?`onclick="checkAllSegPeriod('${empId}','${start}','${stop}','${L}')"`:''} title="${on?'Check all':'View only'}">${lbl}${allChk(L)?' <i class="ti ti-check" style="color:var(--ok)"></i>':''}</th>`; };
@@ -1820,18 +1863,40 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
   // leave entries + auto company holidays for the period, grouped by day
   const leaveByDay={}; DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ (leaveByDay[l.date]=leaveByDay[l.date]||[]).push(l); });
   const holByDay={}; holidaysInRange(start,stop).forEach(h=>{ (holByDay[h.date]=holByDay[h.date]||[]).push(h); });
+  const _leaveTot = DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).reduce((s,l)=>s+l.hours,0) + holidaysInRange(start,stop).reduce((s,h)=>s+(h.hours||CFG.holidayHours),0);
   const workedByDay={}; tc.days.forEach(d=>workedByDay[d.ymd]=d);
   const allDates=[...new Set([...tc.days.map(d=>d.ymd), ...Object.keys(leaveByDay), ...Object.keys(holByDay)])].sort();
-  const leaveRow=(l,wd)=>`<tr class="tc-day tc-leave">
-    <td></td><td class="apcol" colspan="3"><span class="leavetag">Leave</span></td>
-    <td></td><td class="brk"></td>
-    <td class="${editable?'editcell':''}" colspan="2" ${editable?`onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})' title="Edit or delete this leave entry"`:''}><b>${wd}</b> ${l.type} <span class="src">paid</span>${l.note?` · ${l.note}`:''}${editable?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px"></i>':''}</td>
-    <td class="num">${h2(l.hours)}</td><td class="num"></td><td class="num"></td></tr>`;
-  const holRow=(h,wd)=>`<tr class="tc-day tc-leave">
-    <td></td><td class="apcol" colspan="3"><span class="leavetag hol">Holiday</span></td>
-    <td></td><td class="brk"></td>
-    <td colspan="2" style="color:var(--muted)"><b>${wd}</b> ${h.name} <span class="src">company · auto</span></td>
-    <td class="num">${h2(h.hours||CFG.holidayHours)}</td><td class="num"></td><td class="num"></td></tr>`;
+  const dstr=ymd=>ymdD(ymd).toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'});
+  const schedStart=ymd=>{ const ss=scheduleFor(empId,ymd).map(s=>s.start).sort(); return ss.length?fmt12(ss[0]):''; };
+  const leaveRow=(l)=>{ const wk=sundayOf(l.date); const st=schedStart(l.date); const tin=`${dstr(l.date)}${st?' '+st:''}`; const tag=l.type.toLowerCase();
+    const edit=`onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'`;
+    return `<tr class="tc-day">
+      <td></td>
+      <td class="apcol">${box(l.id,'E',wk)}</td><td class="apcol">${box(l.id,'M',wk)}</td><td class="apcol">${box(l.id,'O',wk)}</td>
+      <td><span class="ltag ${tag}" onclick="showLeaveNote('${l.id}')" title="View note">${l.type}</span></td>
+      <td class="edcol"><b>Y</b></td>
+      <td class="brk"></td>
+      <td class="phcol"><i class="ti ti-camera" title="No photo"></i></td>
+      <td class="tin ${editable?'editcell':''}" ${editable?edit+' title="Edit or delete this entry"':''}>${tin}</td>
+      <td style="color:var(--muted)">&laquo; Timesheet &raquo;</td>
+      <td class="num">${h2(l.hours)}</td>
+      <td class="num"><b>${h2(l.hours)}</b></td>
+      <td class="num"></td>
+    </tr>`; };
+  const holRow=(h)=>{ const st=schedStart(h.date); const tin=`${dstr(h.date)}${st?' '+st:''}`;
+    return `<tr class="tc-day">
+    <td></td>
+    <td class="apcol"></td><td class="apcol"></td><td class="apcol"></td>
+    <td><span class="ltag holiday" title="${(h.name+' — company holiday').replace(/"/g,'&quot;')}">Holiday</span></td>
+    <td class="edcol"></td>
+    <td class="brk"></td>
+    <td class="phcol"><i class="ti ti-camera" title="No photo"></i></td>
+    <td style="color:var(--muted)">${tin}</td>
+    <td style="color:var(--muted)">&laquo; Timesheet &raquo;</td>
+    <td class="num">${h2(h.hours||CFG.holidayHours)}</td>
+    <td class="num"><b>${h2(h.hours||CFG.holidayHours)}</b></td>
+    <td class="num"></td>
+  </tr>`; };
 
   let body='';
   allDates.forEach(ymd=>{
@@ -1843,20 +1908,22 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
     const segs=daySegments(d.punches);
     const shift=segs.reduce((s,x)=>s+x.hrs,0);
     if(!segs.length){
-      body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td colspan="3"></td><td></td><td></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
+      body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td class="apcol"></td><td class="apcol"></td><td class="apcol"></td><td></td><td class="edcol"></td><td class="brk"></td><td class="phcol"></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
     }
     segs.forEach((s,si)=>{
       const note=DB.segNotes[s.inId];
       const bl=s.breakMin!=null?(s.breakPaid?(s.breakMin<=12?`${Math.round(s.breakMin)}p`:`12p ${Math.round(s.breakMin-12)}u`):`${Math.round(s.breakMin)}u`):'';
       const last=si===segs.length-1;
       const showWeek = last && d.isWeekEnd;
-      const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}${s.issue?` <i class="ti ti-alert-triangle" style="color:var(--bad);font-size:11px" title="${s.issue}"></i>`:''}`;
+      const inCell=`${fmtDT(s.in,e)}${s.issue?` <i class="ti ti-alert-triangle" style="color:var(--bad);font-size:11px" title="${s.issue}"></i>`:''}`;
       const outCell=s.issue&&s.out===s.in?`<span style="color:var(--bad)">${s.issue}</span>`:(s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>');
       body+=`<tr class="${si===0?'tc-day':''}">
         <td>${dayExc?`<span class="dot" title="${d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).join('; ')}"></span>`:''}</td>
         <td class="apcol">${box(s.inId,'E',d.weekKey)}</td><td class="apcol">${box(s.inId,'M',d.weekKey)}</td><td class="apcol">${box(s.inId,'O',d.weekKey)}</td>
         <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
+        <td class="edcol">${s.manual?'<b>Y</b>':''}</td>
         <td class="brk">${bl}</td>
+        <td class="phcol"><i class="ti ti-camera" title="No photo"></i></td>
         <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${d.weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
         <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${d.weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
         <td class="num">${s.out?h2(s.hrs):'—'}</td>
@@ -1865,8 +1932,8 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
       </tr>`;
     });
     }
-    (leaveByDay[ymd]||[]).forEach(l=>{ body+=leaveRow(l,wd); });
-    (holByDay[ymd]||[]).forEach(h=>{ body+=holRow(h,wd); });
+    (leaveByDay[ymd]||[]).forEach(l=>{ body+=leaveRow(l); });
+    (holByDay[ymd]||[]).forEach(h=>{ body+=holRow(h); });
   });
 
   const flags=tc.days.flatMap(d=>d.exceptions.map(x=>({ymd:d.ymd,x,ex:isExcused(empId,d.ymd,x)})));
@@ -1886,27 +1953,28 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
   ].filter(Boolean).join('');
 
   return `
-  <div class="card">
+  <div class="card hx-accent">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div>
         <h2 style="margin:0"><i class="ti ti-id-badge-2"></i> ${e.name} — ${md(start)} – ${md(stop)}</h2>
         <div class="hint">${TZ[e.tz]} · ${STATE_RULES[e.loc]?STATE_RULES[e.loc].label:e.loc} rules${locked?' · <span class="pill ok"><i class="ti ti-lock"></i> Locked</span>':''}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}</div>
-        <div style="font-size:20px;font-weight:700">${h2(tc.total)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
+        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}${_leaveTot?` · Leave ${h2(_leaveTot)}`:''}</div>
+        <div style="font-size:20px;font-weight:700">${h2(tc.total+_leaveTot)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
       </div>
     </div>
     ${actions?`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${actions}</div>`:''}
     ${openReqs.length?renderReqBanner(empId, start, openReqs, false):''}
     ${anyShowHist?tc.weekKeys.filter(wk=>SHOWHIST.has(approvalKey(empId,wk))).map(wk=>renderHistory(empId,wk)).join(''):''}
     <div style="overflow-x:auto"><table class="tcard">
+      <colgroup><col style="width:3.5%"><col style="width:4%"><col style="width:4%"><col style="width:4%"><col style="width:7%"><col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:15%"><col style="width:13%"><col style="width:7%"><col style="width:7%"><col style="width:7%"></colgroup>
       <thead><tr>
-        <th title="Alert"><i class="ti ti-bell"></i></th>
+        <th title="Exceptions — a red dot flags a day with an unresolved issue (missing punch, meal-premium, unapproved absence)"><i class="ti ti-bell"></i></th>
         ${hdr('E','E')}${hdr('M','M')}${hdr('O','O')}
-        <th>Notes</th><th>Break</th><th>Time In</th><th>Time Out</th><th class="num">Hours</th><th class="num">Shift</th><th class="num">Week</th>
+        <th>Notes</th><th class="edcol">Edited</th><th>Break</th><th class="phcol">Photos</th><th>Time In</th><th>Time Out</th><th class="num">Hours</th><th class="num">Shift</th><th class="num">Week</th>
       </tr></thead>
-      <tbody>${body||`<tr><td colspan="11" class="empty">No entries this period.</td></tr>`}</tbody>
+      <tbody>${body||`<tr><td colspan="13" class="empty">No entries this period.</td></tr>`}</tbody>
     </table></div>
     <div class="hint" style="margin-top:8px">Click <b>E</b>, <b>M</b>, or <b>O</b> in the header to approve every row for that party; or check rows individually. Break codes: <b>u</b> = unpaid meal, <b>p</b> = paid break.</div>
     ${flagBlock}
@@ -2099,11 +2167,14 @@ function closeLeave(){ LEDIT=null; render(); }
 function saveLeave(){
   if(!(LEDIT.hours>0)){ toast('Enter hours'); return; }
   if(LEDIT.id){ const l=DB.leave.find(x=>x.id===LEDIT.id); Object.assign(l,{date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note});
-    chk(Store.removeLeave(l.id),'Leave'); chk(Store.addLeave(l),'Leave'); }
-  else { const l={id:'lv'+Date.now(),emp:LEDIT.empId,date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note}; DB.leave.push(l); chk(Store.addLeave(l),'Leave'); }
+    chk(Store.removeLeave(l.id),'Leave'); chk(Store.addLeave(l),'Leave'); recomputeWeekApproval(l.emp, sundayOf(l.date)); }
+  else { const l={id:'lv'+Date.now(),emp:LEDIT.empId,date:LEDIT.date,type:LEDIT.type,hours:LEDIT.hours,note:LEDIT.note}; DB.leave.push(l); chk(Store.addLeave(l),'Leave'); recomputeWeekApproval(l.emp, sundayOf(l.date)); }
   LEDIT=null; toast('Leave saved'); render();
 }
-function deleteLeave(){ if(LEDIT.id){ DB.leave=DB.leave.filter(x=>x.id!==LEDIT.id); chk(Store.removeLeave(LEDIT.id),'Leave'); } LEDIT=null; toast('Removed'); render(); }
+function deleteLeave(){ if(LEDIT.id){ const l=DB.leave.find(x=>x.id===LEDIT.id); const emp=l?l.emp:null, wk=l?sundayOf(l.date):null;
+    ['E','M','O'].forEach(L=>{ if(DB.segApprovals[segKey(LEDIT.id,L)]){ delete DB.segApprovals[segKey(LEDIT.id,L)]; chk(Store.clearSeg(LEDIT.id,L),'Unapprove'); } });
+    DB.leave=DB.leave.filter(x=>x.id!==LEDIT.id); chk(Store.removeLeave(LEDIT.id),'Leave'); if(emp&&wk) recomputeWeekApproval(emp,wk); }
+  LEDIT=null; toast('Removed'); render(); }
 function leavePeriod(empId,start,stop){
   const t={PTO:0,Sick:0,Holiday:0,Bereavement:0};
   DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
@@ -2535,12 +2606,13 @@ function viewHours(){
     const tab=HOURS.tab||'hours';
     const _lt=leavePeriod(e.id,HOURS.start,HOURS.stop); const _hol=holidayHours(e.id,HOURS.start,HOURS.stop);
     const leaveTot=_lt.PTO+_lt.Sick+_lt.Bereavement+_hol;
+    const grandTot=pd.total+leaveTot;
     const totals=`<div class="totalsbar">
       <div class="tcell"><span>Regular</span><b>${h2(pd.reg)}</b></div>
       <div class="tcell"><span>OT1</span><b>${h2(pd.ot)}</b></div>
       <div class="tcell"><span>OT2</span><b>${h2(pd.dt)}</b></div>
-      <div class="tcell total"><span>Total</span><b>${h2(pd.total)}</b></div>
       <div class="tcell leave"><span>Leave</span><b>${h2(leaveTot)}</b></div>
+      <div class="tcell total"><span>Total</span><b>${h2(grandTot)}</b></div>
     </div>`;
     const periodSel=`
       <div class="field"><label>Period</label>
@@ -2592,10 +2664,7 @@ function viewHours(){
                <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>`
             : `<div class="dl-lbl">Hours — this period</div>
                <button onclick="downloadHoursPDF();this.closest('details').removeAttribute('open')">PDF</button>
-               <button onclick="downloadHoursCSV();this.closest('details').removeAttribute('open')">CSV</button>
-               <div class="dl-lbl" style="margin-top:4px;border-top:1px solid var(--line);padding-top:6px">Occurrences</div>
-               <button onclick="downloadOccPDF();this.closest('details').removeAttribute('open')">PDF</button>
-               <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>`}
+               <button onclick="downloadHoursCSV();this.closest('details').removeAttribute('open')">CSV</button>`}
         </div>
       </details>
       ${me().role==='hr'?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve &amp; send to Payroll</button>`:''}
@@ -2604,7 +2673,7 @@ function viewHours(){
     ${body}`;
   }
 
-  return `<div class="pagehead"><div><h1>Individual Hours</h1><p>Review and finalize timecards by employee.</p></div></div>
+  return `<div class="pagehead"><div><h1>Individual Hours</h1></div></div>
     <div class="hours-layout">${listPanel}<div class="hours-detail">${detail}</div></div>`;
 }
 
@@ -3130,7 +3199,7 @@ function renderLogin(){
   const gate=document.getElementById('gate'); gate.style.display='flex';
   gate.innerHTML=`<div class="gate-card">
     <div class="gate-logo"><i class="ti ti-clock-hour-4"></i></div>
-    <h1>Timekeeping</h1><p>WS Display · sign in with your company email</p>
+    <h1>WS Time</h1><p>WS Display · sign in with your company email</p>
     <input id="li-email" type="email" placeholder="you@wsdisplay.com" autocomplete="username">
     <input id="li-pass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="gate-err" id="li-err"></div>
@@ -3167,6 +3236,10 @@ async function boot(){
   }
   rebuildManages(); seedState(); render();   // offline demo
 }
+// close the Download dropdown when clicking anywhere outside it
+document.addEventListener('click', (ev)=>{
+  document.querySelectorAll('details.dl-menu[open]').forEach(d=>{ if(!d.contains(ev.target)) d.removeAttribute('open'); });
+});
 boot();
 </script>
 </body>

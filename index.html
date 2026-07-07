@@ -22,7 +22,33 @@ input,select{font-family:inherit;font-size:14px}
 
 /* Layout */
 .app{display:flex;min-height:100vh}
-.side{width:230px;background:var(--grad);color:#fff;display:flex;flex-direction:column;position:fixed;height:100vh;z-index:20}
+.side{width:250px;background:var(--grad);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:60;transform:translateX(-100%);transition:transform .22s ease}
+.side.open{transform:translateX(0);box-shadow:0 0 44px rgba(0,0,0,.35)}
+.side-backdrop{position:fixed;inset:0;background:rgba(8,15,30,.42);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
+.side-backdrop.show{opacity:1;pointer-events:auto}
+.apptop{position:sticky;top:0;z-index:30;height:56px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--line)}
+.hamburger{width:40px;height:40px;border-radius:9px;background:transparent;display:grid;place-items:center;font-size:23px;color:var(--navy)}
+.hamburger:hover{background:#eef1f7}
+.apptop-brand{display:flex;align-items:center;gap:9px;font-weight:700;color:var(--navy);font-size:15px}
+.apptop-brand .tlogo{width:30px;height:30px;border-radius:8px;background:var(--grad);color:#fff;display:grid;place-items:center;font-size:17px}
+.apptop-brand span{font-weight:400;font-size:11.5px;color:var(--muted)}
+@media(max-width:560px){.apptop-brand span{display:none}}
+.drawer-close{background:rgba(255,255,255,.12);color:#fff;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:16px}
+.drawer-close:hover{background:rgba(255,255,255,.22)}
+/* collapsible HR sections */
+.card.collapsible{padding:0;overflow:hidden}
+.sec-head{width:100%;display:flex;align-items:center;gap:12px;padding:16px 20px;background:none;text-align:left}
+.sec-head:hover{background:#f7f9fc}
+.sec-icon{color:var(--accent);font-size:19px}
+.sec-title{font-size:15px;font-weight:600;color:#111827}
+.sec-sum{margin-left:auto;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sec-chev{color:var(--muted);font-size:18px;transition:transform .2s}
+.card.collapsible.open .sec-chev{transform:rotate(180deg)}
+.sec-body{padding:2px 20px 20px}
+/* add-entry toggle */
+.entrytoggle{display:flex;gap:6px;background:#eef1f7;padding:4px;border-radius:10px}
+.entrytoggle .et{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;background:none}
+.entrytoggle .et.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .brand{padding:20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.12)}
 .brand .logo{width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:20px}
 .brand b{font-size:15px;letter-spacing:.3px}
@@ -38,7 +64,7 @@ input,select{font-family:inherit;font-size:14px}
 .whoami select{width:100%;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff}
 .whoami select option{color:#111}
 
-.main{margin-left:230px;flex:1;padding:26px 30px;max-width:100%}
+.main{margin-left:0;flex:1;padding:22px 26px;max-width:100%}
 .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px}
 .pagehead h1{font-size:22px;font-weight:700}
 .pagehead p{color:var(--muted);font-size:13px;margin-top:3px}
@@ -124,7 +150,7 @@ tr:last-child td{border-bottom:none}
 .toast.show{opacity:1;transform:translateY(0)}
 
 /* Modal */
-.modal{position:fixed;inset:0;background:rgba(15,30,61,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal{position:fixed;inset:0;background:rgba(15,30,61,.5);display:none;align-items:center;justify-content:center;z-index:80;padding:20px}
 .modal.show{display:flex}
 .modalcard{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
 .modalhead{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start}
@@ -256,11 +282,13 @@ tr:last-child td{border-bottom:none}
 .hours-layout.collapsed{grid-template-columns:1fr}
 @media(max-width:900px){.hours-layout{grid-template-columns:1fr}}
 .emplist{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:sticky;top:20px}
-.emplist-head{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
-.sortrow{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.sortrow>span{white-space:nowrap;font-weight:600}
-.sortrow select{flex:1;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe;font-size:13px}
-.emp-search{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fbfcfe}
+.emplist-head{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.sortchip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:#fbfcfe;border:1px solid var(--line);border-radius:999px;padding:5px 8px 5px 12px;align-self:flex-start}
+.sortchip>span{white-space:nowrap;font-weight:600}
+.sortchip select{border:none;background:none;font-size:13px;font-weight:600;color:var(--navy);padding:2px 2px;cursor:pointer}
+.emp-search{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(15,30,61,.04)}
+.emp-search i{color:var(--muted);font-size:16px}
+.emp-search input{border:none;background:none;flex:1;font-size:13px;outline:none;color:var(--navy)}
 .emplist-count{font-size:11px;color:var(--muted)}
 .emplist-body{max-height:620px;overflow-y:auto}
 .emp-group{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);background:#f4f6fb;padding:7px 12px;position:sticky;top:0}
@@ -317,6 +345,9 @@ tr:last-child td{border-bottom:none}
 .tcard th.apcol.clickable:hover{background:#eef2ff}
 .tcard input[type=checkbox]{width:16px;height:16px;accent-color:var(--ok);cursor:pointer}
 .tcard .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad)}
+.tcard tr.tc-leave td{background:#fbfbff}
+.leavetag{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#5b6bb8;background:#eef1ff;border:1px solid #dbe4ff;border-radius:6px;padding:2px 6px}
+.leavetag.hol{color:#a86800;background:#fff6df;border-color:#f0e3b8}
 .tcard .brk{color:var(--muted);font-variant-numeric:tabular-nums}
 .tcard .tin b{color:var(--navy)}
 .tcard .editcell{cursor:pointer}
@@ -341,6 +372,13 @@ tr:last-child td{border-bottom:none}
 
 .hours-detail{min-width:0}
 .detail-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.dl-menu{position:relative}
+.dl-menu>summary{list-style:none;cursor:pointer}
+.dl-menu>summary::-webkit-details-marker{display:none}
+.dl-pop{position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(15,30,61,.14);padding:6px;z-index:45;min-width:190px;display:flex;flex-direction:column;gap:2px}
+.dl-pop .dl-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:6px 10px 2px}
+.dl-pop button{text-align:left;background:none;border:none;padding:9px 12px;border-radius:8px;font-size:13px;color:var(--navy);cursor:pointer;display:flex;align-items:center;gap:8px}
+.dl-pop button:hover{background:#f4f6fb}
 .detail-nav{display:flex;flex-direction:column;gap:3px}
 .detail-nav .iconbtn{width:28px;height:22px;background:#eef1f7}
 .detail-who b{font-size:18px} .detail-who span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
@@ -353,6 +391,7 @@ tr:last-child td{border-bottom:none}
 .tcell span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
 .tcell b{font-size:17px;font-variant-numeric:tabular-nums}
 .tcell.total{background:var(--navy);color:#fff} .tcell.total span{color:rgba(255,255,255,.7)}
+.tcell.leave{background:#fff8e1} .tcell.leave b{color:#a86800}
 
 /* Sub-tabs (Overrides / Recurring) */
 .subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
@@ -378,11 +417,16 @@ tr:last-child td{border-bottom:none}
 </style>
 </head>
 <body>
+<div class="apptop">
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu"><i class="ti ti-menu-2"></i></button>
+  <div class="apptop-brand"><span class="tlogo"><i class="ti ti-clock-hour-4"></i></span>Timekeeping <span>WS Display · HR</span></div>
+</div>
 <div class="app">
   <aside class="side">
     <div class="brand">
       <div class="logo"><i class="ti ti-clock-hour-4"></i></div>
-      <div><b>Timekeeping</b><span>WS Display · HR</span></div>
+      <div style="flex:1"><b>Timekeeping</b><span>WS Display · HR</span></div>
+      <button class="drawer-close" onclick="toggleSidebar(false)" aria-label="Close"><i class="ti ti-x"></i></button>
     </div>
     <nav class="nav" id="nav"></nav>
     <div class="whoami">
@@ -393,6 +437,7 @@ tr:last-child td{border-bottom:none}
   </aside>
   <main class="main" id="main"></main>
 </div>
+<div class="side-backdrop" id="sideBackdrop" onclick="toggleSidebar(false)"></div>
 <div class="gate" id="gate" style="display:none"></div>
 <div class="toast" id="toast"></div>
 <div class="modal" id="modal"></div>
@@ -639,14 +684,17 @@ const CFG = {
   earlyMin:5,               // >5 min before scheduled start (unapproved) = Clock In Early
   leaveMin:5,               // >5 min before scheduled end = Leaving Early
   holidayHours:8,           // default paid hours per company holiday
-  dedupMin:3                // punches of same type within N min are de-duplicated (latest source wins)
+  dedupMin:3,               // punches of same type within N min are de-duplicated (latest source wins)
+  trackingStart:''          // company go-live floor (YYYY-MM-DD); blank = start counting from each employee's first punch
 };
 function disciplineTier(pts){
-  if(pts>15) return {label:'Final warning / suspension / termination', tone:'bad'};
-  if(pts>=11) return {label:'Written warning', tone:'bad'};
-  if(pts>=6) return {label:'Verbal warning', tone:'warn'};
-  if(pts>=1) return {label:'Coaching', tone:'warn'};
-  return {label:'Good standing', tone:'ok'};
+  // WS Display attendance policy — progressive, by total accumulated (rolling 12-mo) points.
+  // Coaching 1–5 · Verbal 6–10 · Written 11–15 · Final 16+
+  if(pts>=16) return {label:'Final warning / suspension / termination', tone:'bad',  band:'16+'};
+  if(pts>=11) return {label:'Written warning',                          tone:'bad',  band:'11–15'};
+  if(pts>=6)  return {label:'Verbal warning',                           tone:'warn', band:'6–10'};
+  if(pts>=1)  return {label:'Coaching / informal',                      tone:'warn', band:'1–5'};
+  return {label:'Good standing', tone:'ok', band:'0'};
 }
 const JOBCODES=['CA - REG','PA - REG','Training','Meeting'];
 
@@ -1090,7 +1138,12 @@ const SCREENS = [
 ];
 let SCREEN = 'dash';
 
-function nav(id){ SCREEN=id; render(); }
+function nav(id){ SCREEN=id; toggleSidebar(false); render(); }
+function toggleSidebar(force){
+  const s=document.querySelector('.side'); const b=document.getElementById('sideBackdrop'); if(!s||!b) return;
+  const open = force===undefined ? !s.classList.contains('open') : force;
+  s.classList.toggle('open', open); b.classList.toggle('show', open);
+}
 function signInAs(id){ CURRENT=id; const u=me();
   if(!SCREENS.find(s=>s.id===SCREEN)?.roles.includes(u.role)) SCREEN='dash';
   HOURS=null; SCHED=null; REPORT=null; render();
@@ -1401,7 +1454,25 @@ function viewDash(){
       : `<div class="empty">No alerts.</div>`,
     {screen:'notify',label:'Open Notifications'}, myAlerts.some(a=>a.type==='tier'||a.type==='approval')?'bad':'warn');
 
-  return hero + `<div class="wboard">${wStatus}${wAlert}${wOT}${wNeed}${wAtt}${wHours}${wReq}${wAppr}${wExc}</div>`;
+  // --- Premiums report: all employees, LAST pay period (the one being paid out) ---
+  const ppStart=ymdAdd(payPeriodStart(todayYmd(u)),-14), ppStop=ymdAdd(ppStart,13);
+  const premAgg=scope.map(e=>({e, ...premiumHours(e.id,ppStart,ppStop)})).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+  const premGrand=premAgg.reduce((s,x)=>s+x.total,0);
+  const manualEntries=[];
+  scope.forEach(e=>DB.premiums.filter(p=>p.emp===e.id && p.date>=ppStart && p.date<=ppStop).forEach(p=>manualEntries.push({e,p})));
+  manualEntries.sort((a,b)=>a.p.date.localeCompare(b.p.date));
+  const wPrem = widget('ti-cash-banknote','Premiums — last pay period', h2(premGrand),
+    `<div class="hint" style="margin-bottom:8px">Period being paid out: <b>${md(ppStart)} – ${md(ppStop)}</b></div>
+    ${premAgg.length? `<table class="wtable"><thead><tr><th>Name</th><th class="num">Meal (auto)</th><th class="num">Manual</th><th class="num">Total</th></tr></thead><tbody>
+      ${premAgg.map(x=>`<tr><td>${x.e.name}</td><td class="num">${h2(x.auto)}</td><td class="num">${h2(x.manual)}</td><td class="num"><b>${h2(x.total)}</b></td></tr>`).join('')}
+    </tbody></table>
+    ${manualEntries.length? `<div class="hint" style="margin-top:10px">Manual entries${me().role==='hr'?' — click to remove':''}</div>
+      ${manualEntries.map(({e,p})=>`<div class="wrow"><div><b>${e.name}</b><div class="listsub">${p.reason} · ${md(p.date)} · ${h2(p.hours)}</div></div>${me().role==='hr'?`<button class="excuse-btn" onclick="deletePremium('${p.id}')">delete</button>`:''}</div>`).join('')}`
+      : `<div class="hint" style="margin-top:10px">No manual premiums — add per employee via Hours → Add entry → Premium.</div>`}`
+      : `<div class="empty">No premiums for the period being paid out.</div>`}`,
+    {screen:'hours',label:'Open Hours'}, premGrand>0?'ok':'');
+
+  return hero + `<div class="wboard">${wStatus}${wAlert}${wOT}${wNeed}${wAtt}${wPrem}${wHours}${wReq}${wAppr}${wExc}</div>`;
 }
 
 /* ---------- PUNCH STATUS (fed by biometric clock + external web clock) ---------- */
@@ -1489,16 +1560,19 @@ function resetWeekApprovals(empId, weekKey){
   weekSegIds(empId,weekKey).forEach(id=>['E','M','O'].forEach(L=>{ delete DB.segApprovals[segKey(id,L)]; Store.clearSeg(id,L); }));
   const a=DB.approvals[approvalKey(empId,weekKey)]; if(a){a.employee=null;a.manager=null;a.hr=null;a.locked=false;}
 }
-function openPunch(empId, weekKey, punchId){
+function openPunch(empId, weekKey, punchId, rangeStart, rangeEnd){
   EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;
   if(getApproval(empId,weekKey).locked){ toast('Period is locked — reopen it to edit'); return; }
   const e=emp(empId);
+  const rs=rangeStart||weekKey, re=rangeEnd||ymdAdd(weekKey,6);
+  const base={empId, weekKey, rangeStart:rs, rangeEnd:re, kind:'punch', leaveType:LEAVE_TYPES[0], hours:8, premHours:1, premReason:'Missed rest break', note:''};
   if(punchId){ const p=DB.punches.find(x=>x.id===punchId); if(!p) return;
-    PUNCH={mode:'edit', id:punchId, empId, weekKey, ymd:partsInTz(p.ts,e.tz).ymd, time:hhmm(p.ts,e), type:p.type, reason:''}; }
-  else PUNCH={mode:'add', id:null, empId, weekKey, ymd:weekKey, time:'08:00', type:'in', reason:''};
+    PUNCH={...base, mode:'edit', id:punchId, ymd:partsInTz(p.ts,e.tz).ymd, time:hhmm(p.ts,e), type:p.type, reason:''}; }
+  else PUNCH={...base, mode:'add', id:null, ymd:rs, time:'08:00', type:'in', reason:''};
   render();
 }
 function puSet(f,v){ PUNCH[f]=v; }
+function puKind(k){ PUNCH.kind=k; render(); }
 function closePunch(){ PUNCH=null; render(); }
 // find the in-punch id of the segment a given punch belongs to (so the note lands on that row)
 function segInIdForPunch(empId, ymd, punchId){
@@ -1508,49 +1582,90 @@ function segInIdForPunch(empId, ymd, punchId){
   const s=segs.find(x=>x.inId===punchId) || segs.find(x=>x.outId===punchId);
   return s?s.inId:punchId;
 }
+function saveEntry(){ return PUNCH.kind==='leave' ? saveLeaveEntry() : PUNCH.kind==='premium' ? savePremiumEntry() : savePunch(); }
+function saveLeaveEntry(){
+  if(!(PUNCH.hours>0)){ toast('Enter hours'); return; }
+  const l={id:'lv'+Date.now()+Math.random().toString(36).slice(2,5), emp:PUNCH.empId, date:PUNCH.ymd, type:PUNCH.leaveType, hours:PUNCH.hours, note:PUNCH.note||''};
+  DB.leave.push(l); chk(Store.addLeave(l),'Leave');
+  PUNCH=null; toast(`${l.type} added (${h2(l.hours)})`); render();
+}
+function savePremiumEntry(){
+  if(!(PUNCH.premHours>0)){ toast('Enter hours'); return; }
+  const p={id:'pm'+Date.now()+Math.random().toString(36).slice(2,5), emp:PUNCH.empId, date:PUNCH.ymd, hours:PUNCH.premHours, reason:(PUNCH.premReason||'Premium').trim(), by:me().name, at:new Date().toISOString()};
+  DB.premiums.push(p); chk(Store.addPremium(p),'Premium');
+  PUNCH=null; toast(`Premium added (${h2(p.hours)})`); render();
+}
 function savePunch(){
   if(!PUNCH.reason.trim()){ toast('Add a reason for the adjustment'); return; }
   const e=emp(PUNCH.empId); const iso=wallToUtc(PUNCH.ymd, PUNCH.time, e.tz); const by=me().name; const reason=PUNCH.reason.trim();
+  const wk=sundayOf(PUNCH.ymd);   // week the chosen date falls in (add-from-period can span two weeks)
   let targetId=PUNCH.id;
   if(PUNCH.mode==='add'){
     targetId='p'+Date.now()+Math.random().toString(36).slice(2,5);
     const np={id:targetId, emp:PUNCH.empId, ts:iso, type:PUNCH.type, source:'manual', editedBy:by};
     DB.punches.push(np); Store.addPunch(np);
-    audit('add',PUNCH.empId,PUNCH.weekKey,targetId,null,{time:PUNCH.time,type:PUNCH.type},by,reason);
+    audit('add',PUNCH.empId,wk,targetId,null,{time:PUNCH.time,type:PUNCH.type},by,reason);
   } else {
     const p=DB.punches.find(x=>x.id===PUNCH.id); const b={time:hhmm(p.ts,e),type:p.type};
     p.ts=iso; p.type=PUNCH.type; p.source='manual'; p.editedBy=by; Store.editPunch(p);
-    audit('edit',PUNCH.empId,PUNCH.weekKey,p.id,b,{time:PUNCH.time,type:PUNCH.type},by,reason);
+    audit('edit',PUNCH.empId,wk,p.id,b,{time:PUNCH.time,type:PUNCH.type},by,reason);
   }
   // put the reason into the Notes for the affected segment's row
   const noteSeg=segInIdForPunch(PUNCH.empId, PUNCH.ymd, targetId);
   DB.segNotes[noteSeg]=reason; Store.setNote(noteSeg, PUNCH.empId, reason, by);
-  resetWeekApprovals(PUNCH.empId, PUNCH.weekKey);
+  resetWeekApprovals(PUNCH.empId, wk);
   PUNCH=null; toast('Punch saved'); render();
 }
 function deletePunch(){
   if(!PUNCH.reason.trim()){ toast('Add a reason for the adjustment'); return; }
-  if(PUNCH.id){ DB.punches=DB.punches.filter(x=>x.id!==PUNCH.id); Store.removePunch(PUNCH.id);
-    audit('delete',PUNCH.empId,PUNCH.weekKey,PUNCH.id,{time:PUNCH.time,type:PUNCH.type},null,me().name,PUNCH.reason.trim());
-    resetWeekApprovals(PUNCH.empId,PUNCH.weekKey); }
+  if(PUNCH.id){ const wk=sundayOf(PUNCH.ymd); DB.punches=DB.punches.filter(x=>x.id!==PUNCH.id); Store.removePunch(PUNCH.id);
+    audit('delete',PUNCH.empId,wk,PUNCH.id,{time:PUNCH.time,type:PUNCH.type},null,me().name,PUNCH.reason.trim());
+    resetWeekApprovals(PUNCH.empId,wk); }
   PUNCH=null; toast('Punch removed'); render();
 }
 function renderPunchModal(){
-  const host=document.getElementById('modal'); const e=emp(PUNCH.empId); const wkEnd=ymdAdd(PUNCH.weekKey,6);
-  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${PUNCH.mode==='add'?'Add':'Edit'} punch</b><div class="hint">${e.name} · ${weekLabel(PUNCH.weekKey)}</div></div>
-    <button class="btn ghost sm" onclick="closePunch()"><i class="ti ti-x"></i></button></div>
-    <div class="modalbody">
-      <div class="field"><label>Type</label><select onchange="puSet('type',this.value)">${TYPES.map(t=>`<option value="${t}" ${PUNCH.type===t?'selected':''}>${labelType(t)}</option>`).join('')}</select></div>
+  const host=document.getElementById('modal'); const e=emp(PUNCH.empId);
+  const rs=PUNCH.rangeStart, re=PUNCH.rangeEnd; const kind=PUNCH.kind;
+  const toggle = PUNCH.mode==='add' ? `<div class="entrytoggle">
+      <button class="et ${kind==='punch'?'on':''}" onclick="puKind('punch')"><i class="ti ti-clock"></i> Punch</button>
+      <button class="et ${kind==='leave'?'on':''}" onclick="puKind('leave')"><i class="ti ti-calendar-check"></i> Timesheet entry</button>
+      <button class="et ${kind==='premium'?'on':''}" onclick="puKind('premium')"><i class="ti ti-cash-banknote"></i> Premium</button>
+    </div>` : '';
+  let form;
+  if(kind==='leave'){ form = `
       <div class="formgrid" style="margin-top:14px">
-        <div class="field"><label>Date</label><input type="date" value="${PUNCH.ymd}" min="${PUNCH.weekKey}" max="${wkEnd}" onchange="puSet('ymd',this.value)"></div>
+        <div class="field"><label>Type</label><select onchange="puSet('leaveType',this.value)">${LEAVE_TYPES.map(t=>`<option ${PUNCH.leaveType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="field"><label>Hours</label><input type="number" step="0.25" min="0" value="${PUNCH.hours}" onchange="puSet('hours',+this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Date</label><input type="date" value="${PUNCH.ymd}" min="${rs}" max="${re}" onchange="puSet('ymd',this.value)"></div>
+      <div class="field" style="margin-top:14px"><label>Note (optional)</label><input value="${(PUNCH.note||'').replace(/"/g,'&quot;')}" oninput="PUNCH.note=this.value" placeholder="e.g. Scheduled vacation"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> Paid hours feed payroll and waive attendance points for that day. PTO/Sick balances are tracked in the HR Hub.</div>`;
+  } else if(kind==='premium'){ form = `
+      <div class="formgrid" style="margin-top:14px">
+        <div class="field"><label>Hours</label><input type="number" step="0.25" min="0" value="${PUNCH.premHours}" onchange="puSet('premHours',+this.value)"></div>
+        <div class="field"><label>Date</label><input type="date" value="${PUNCH.ymd}" min="${rs}" max="${re}" onchange="puSet('ymd',this.value)"></div>
+      </div>
+      <div class="field" style="margin-top:14px"><label>Reason</label>
+        <input value="${(PUNCH.premReason||'').replace(/"/g,'&quot;')}" oninput="PUNCH.premReason=this.value" placeholder="e.g. Missed rest break"></div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> Premium hours feed payroll. Meal premiums are detected automatically from punches — add here only for rest-break or other manual premiums. Manage all premiums from the dashboard.</div>`;
+  } else { form = `
+      <div class="field" style="margin-top:14px"><label>Type</label><select onchange="puSet('type',this.value)">${TYPES.map(t=>`<option value="${t}" ${PUNCH.type===t?'selected':''}>${labelType(t)}</option>`).join('')}</select></div>
+      <div class="formgrid" style="margin-top:14px">
+        <div class="field"><label>Date</label><input type="date" value="${PUNCH.ymd}" min="${rs}" max="${re}" onchange="puSet('ymd',this.value)"></div>
         <div class="field"><label>Time</label><input type="time" value="${PUNCH.time}" onchange="puSet('time',this.value)"></div>
       </div>
       <div class="field" style="margin-top:14px"><label>Reason for adjustment (required)</label>
         <input value="${(PUNCH.reason||'').replace(/"/g,'&quot;')}" oninput="PUNCH.reason=this.value" placeholder="e.g. Employee forgot to clock out"></div>
-      <div class="notewarn"><i class="ti ti-info-circle"></i> The reason is saved to this row's Notes and the timecard history, and resets the week's approvals.</div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> The reason is saved to this row's Notes and the timecard history, and resets the period's approvals.</div>`;
+  }
+  host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>${PUNCH.mode==='add'?'Add':'Edit'} entry</b><div class="hint">${e.name} · ${md(rs)} – ${md(re)}</div></div>
+    <button class="btn ghost sm" onclick="closePunch()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      ${toggle}
+      ${form}
     </div>
-    <div class="modalfoot">${PUNCH.mode==='edit'?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deletePunch()"><i class="ti ti-trash"></i> Delete</button>`:''}
-      <button class="btn ghost" onclick="closePunch()">Cancel</button><button class="btn primary" onclick="savePunch()">Save</button></div></div>`;
+    <div class="modalfoot">${PUNCH.mode==='edit'&&PUNCH.kind==='punch'?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deletePunch()"><i class="ti ti-trash"></i> Delete</button>`:''}
+      <button class="btn ghost" onclick="closePunch()">Cancel</button><button class="btn primary" onclick="saveEntry()">Save</button></div></div>`;
   host.classList.add('show');
 }
 
@@ -1636,7 +1751,6 @@ function renderTimecard(empId, weekKey, viewerLayer){
         <div style="font-size:20px;font-weight:700">${h2(tc.total)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">${statusPill('E')}${statusPill('M')}${statusPill('O')}</div>
     ${actions?`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${actions}</div>`:''}
     ${renderReqBanner(empId, weekKey, openReqs, false)}
     ${showHist?renderHistory(empId,weekKey):''}
@@ -1653,6 +1767,152 @@ function renderTimecard(empId, weekKey, viewerLayer){
   </div>`;
 }
 
+/* ---------- Period timecard: one combined table for the whole pay period ---------- */
+function periodTimecard(empId, start, stop){
+  const e=emp(empId); const days=[]; let reg=0,ot=0,dt=0,total=0; const weekKeys=[];
+  let cur=sundayOf(start);
+  while(cur<=stop){
+    const tc=buildTimecard(empId,cur); reg+=tc.reg; ot+=tc.ot; dt+=tc.dt; total+=tc.total; weekKeys.push(cur);
+    tc.days.filter(d=>d.ymd>=start && d.ymd<=stop).forEach(d=>days.push({...d, weekKey:cur, weekTotal:tc.total}));
+    cur=ymdAdd(cur,7);
+  }
+  days.sort((a,b)=>a.ymd.localeCompare(b.ymd));
+  const lastByWeek={}; days.forEach((d,i)=>{ lastByWeek[d.weekKey]=i; });
+  days.forEach((d,i)=>{ d.isWeekEnd = lastByWeek[d.weekKey]===i; });
+  return {e, days, reg, ot, dt, total, weekKeys};
+}
+function periodSegIds(days){ const ids=[]; days.forEach(d=>daySegments(d.punches).forEach(s=>ids.push(s.inId))); return ids; }
+function periodLocked(empId, weekKeys){ return weekKeys.length>0 && weekKeys.every(wk=>getApproval(empId,wk).locked); }
+function checkAllSegPeriod(empId,start,stop,L){
+  if(!canToggleLayer(L,empId)) return;
+  const tc=periodTimecard(empId,start,stop); if(periodLocked(empId,tc.weekKeys)) return;
+  const ids=periodSegIds(tc.days); const allOn=ids.length>0 && ids.every(id=>segApproved(id,L));
+  ids.forEach(id=>{ const k=segKey(id,L);
+    if(allOn){ delete DB.segApprovals[k]; chk(Store.clearSeg(id,L),'Unapprove'); }
+    else { DB.segApprovals[k]={by:me().name,at:new Date().toISOString()}; chk(Store.setSeg(id,L,empId,me().name),'Approve'); } });
+  tc.weekKeys.forEach(wk=>recomputeWeekApproval(empId,wk)); render();
+}
+function unlockPeriod(empId,start,stop){
+  const tc=periodTimecard(empId,start,stop);
+  tc.weekKeys.forEach(wk=>{ weekSegIds(empId,wk).forEach(id=>{ delete DB.segApprovals[segKey(id,'O')]; chk(Store.clearSeg(id,'O'),'Unlock'); }); recomputeWeekApproval(empId,wk); });
+  toast('Timecard unlocked'); render();
+}
+function openPeriodEntry(empId,start,stop){
+  const tc=periodTimecard(empId,start,stop);
+  const wk=tc.weekKeys.find(w=>!getApproval(empId,w).locked)||sundayOf(start);
+  openPunch(empId, wk, null, start, stop);
+}
+function togglePeriodHist(empId,start,stop){
+  const tc=periodTimecard(empId,start,stop);
+  const anyOn=tc.weekKeys.some(wk=>SHOWHIST.has(approvalKey(empId,wk)));
+  tc.weekKeys.forEach(wk=>{ const k=approvalKey(empId,wk); if(anyOn) SHOWHIST.delete(k); else SHOWHIST.add(k); });
+  render();
+}
+function renderPeriodTimecard(empId, start, stop, viewerLayer){
+  const tc=periodTimecard(empId,start,stop); const e=tc.e;
+  const locked=periodLocked(empId,tc.weekKeys);
+  const ids=periodSegIds(tc.days);
+  const allChk = L => ids.length>0 && ids.every(id=>segApproved(id,L));
+  const box = (inId,L,wk) => `<input type="checkbox" ${segApproved(inId,L)?'checked':''} ${(canToggleLayer(L,empId)&&!locked)?'':'disabled'} onchange="toggleSeg('${inId}','${L}','${empId}','${wk}')">`;
+  const hdr = (L,lbl) => { const on=canToggleLayer(L,empId)&&!locked; return `<th class="apcol ${on?'clickable':''}" ${on?`onclick="checkAllSegPeriod('${empId}','${start}','${stop}','${L}')"`:''} title="${on?'Check all':'View only'}">${lbl}${allChk(L)?' <i class="ti ti-check" style="color:var(--ok)"></i>':''}</th>`; };
+
+  const editable=can('edit',empId) && !locked;
+  // leave entries + auto company holidays for the period, grouped by day
+  const leaveByDay={}; DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ (leaveByDay[l.date]=leaveByDay[l.date]||[]).push(l); });
+  const holByDay={}; holidaysInRange(start,stop).forEach(h=>{ (holByDay[h.date]=holByDay[h.date]||[]).push(h); });
+  const workedByDay={}; tc.days.forEach(d=>workedByDay[d.ymd]=d);
+  const allDates=[...new Set([...tc.days.map(d=>d.ymd), ...Object.keys(leaveByDay), ...Object.keys(holByDay)])].sort();
+  const leaveRow=(l,wd)=>`<tr class="tc-day tc-leave">
+    <td></td><td class="apcol" colspan="3"><span class="leavetag">Leave</span></td>
+    <td></td><td class="brk"></td>
+    <td class="${editable?'editcell':''}" colspan="2" ${editable?`onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})' title="Edit or delete this leave entry"`:''}><b>${wd}</b> ${l.type} <span class="src">paid</span>${l.note?` · ${l.note}`:''}${editable?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px"></i>':''}</td>
+    <td class="num">${h2(l.hours)}</td><td class="num"></td><td class="num"></td></tr>`;
+  const holRow=(h,wd)=>`<tr class="tc-day tc-leave">
+    <td></td><td class="apcol" colspan="3"><span class="leavetag hol">Holiday</span></td>
+    <td></td><td class="brk"></td>
+    <td colspan="2" style="color:var(--muted)"><b>${wd}</b> ${h.name} <span class="src">company · auto</span></td>
+    <td class="num">${h2(h.hours||CFG.holidayHours)}</td><td class="num"></td><td class="num"></td></tr>`;
+
+  let body='';
+  allDates.forEach(ymd=>{
+    const dt=new Date(ymd+'T00:00:00Z');
+    const wd=dt.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'});
+    const d=workedByDay[ymd];
+    if(d){
+    const dayExc=d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).length>0;
+    const segs=daySegments(d.punches);
+    const shift=segs.reduce((s,x)=>s+x.hrs,0);
+    if(!segs.length){
+      body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td colspan="3"></td><td></td><td></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
+    }
+    segs.forEach((s,si)=>{
+      const note=DB.segNotes[s.inId];
+      const bl=s.breakMin!=null?(s.breakPaid?(s.breakMin<=12?`${Math.round(s.breakMin)}p`:`12p ${Math.round(s.breakMin-12)}u`):`${Math.round(s.breakMin)}u`):'';
+      const last=si===segs.length-1;
+      const showWeek = last && d.isWeekEnd;
+      const inCell=`${si===0?`<b>${wd}</b> `:''}${fmtDT(s.in,e)}${s.manual?' <i class="ti ti-pencil" style="color:var(--warn);font-size:11px" title="edited"></i>':''}${s.issue?` <i class="ti ti-alert-triangle" style="color:var(--bad);font-size:11px" title="${s.issue}"></i>`:''}`;
+      const outCell=s.issue&&s.out===s.in?`<span style="color:var(--bad)">${s.issue}</span>`:(s.out?fmtDT(s.out,e):'<span style="color:var(--bad)">— missing</span>');
+      body+=`<tr class="${si===0?'tc-day':''}">
+        <td>${dayExc?`<span class="dot" title="${d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).join('; ')}"></span>`:''}</td>
+        <td class="apcol">${box(s.inId,'E',d.weekKey)}</td><td class="apcol">${box(s.inId,'M',d.weekKey)}</td><td class="apcol">${box(s.inId,'O',d.weekKey)}</td>
+        <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
+        <td class="brk">${bl}</td>
+        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${d.weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
+        <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${d.weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
+        <td class="num">${s.out?h2(s.hrs):'—'}</td>
+        <td class="num">${last?`<b>${h2(shift)}</b>`:''}</td>
+        <td class="num">${showWeek?`<b>${h2(d.weekTotal)}</b>`:''}</td>
+      </tr>`;
+    });
+    }
+    (leaveByDay[ymd]||[]).forEach(l=>{ body+=leaveRow(l,wd); });
+    (holByDay[ymd]||[]).forEach(h=>{ body+=holRow(h,wd); });
+  });
+
+  const flags=tc.days.flatMap(d=>d.exceptions.map(x=>({ymd:d.ymd,x,ex:isExcused(empId,d.ymd,x)})));
+  const flagBlock=flags.length? `<div class="tc-flags">${flags.map(f=>{
+      const btn=me().role==='hr'?`<button class="excuse-btn" onclick="toggleExcuse('${empId}','${f.ymd}','${encodeURIComponent(f.x)}')">${f.ex?'undo':'override'}</button>`:'';
+      return `<span class="exc ${f.ex?'excused':''}"><i class="ti ti-alert-triangle-filled"></i> ${md(f.ymd)}: ${f.x}${f.ex?' <em>· excused</em>':''} ${btn}</span>`;
+    }).join('')}</div>`:'';
+
+  const histCount=DB.audit.filter(x=>x.emp===empId && tc.weekKeys.includes(x.weekKey)).length;
+  const anyShowHist=tc.weekKeys.some(wk=>SHOWHIST.has(approvalKey(empId,wk)));
+  const canEdit=can('edit',empId);
+  const openReqs=DB.requests.filter(r=>r.emp===empId && tc.weekKeys.includes(r.weekKey) && r.status==='pending');
+  const actions=[
+    locked && me().role==='hr' ? `<button class="btn ghost sm" onclick="unlockPeriod('${empId}','${start}','${stop}')"><i class="ti ti-lock-open"></i> Unlock</button>` : '',
+    canEdit && !locked ? `<button class="btn ghost sm" onclick="openPeriodEntry('${empId}','${start}','${stop}')"><i class="ti ti-plus"></i> Add entry</button>` : '',
+    histCount ? `<button class="btn ghost sm" onclick="togglePeriodHist('${empId}','${start}','${stop}')"><i class="ti ti-history"></i> History (${histCount})</button>` : ''
+  ].filter(Boolean).join('');
+
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div>
+        <h2 style="margin:0"><i class="ti ti-id-badge-2"></i> ${e.name} — ${md(start)} – ${md(stop)}</h2>
+        <div class="hint">${TZ[e.tz]} · ${STATE_RULES[e.loc]?STATE_RULES[e.loc].label:e.loc} rules${locked?' · <span class="pill ok"><i class="ti ti-lock"></i> Locked</span>':''}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}</div>
+        <div style="font-size:20px;font-weight:700">${h2(tc.total)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
+      </div>
+    </div>
+    ${actions?`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${actions}</div>`:''}
+    ${openReqs.length?renderReqBanner(empId, start, openReqs, false):''}
+    ${anyShowHist?tc.weekKeys.filter(wk=>SHOWHIST.has(approvalKey(empId,wk))).map(wk=>renderHistory(empId,wk)).join(''):''}
+    <div style="overflow-x:auto"><table class="tcard">
+      <thead><tr>
+        <th title="Alert"><i class="ti ti-bell"></i></th>
+        ${hdr('E','E')}${hdr('M','M')}${hdr('O','O')}
+        <th>Notes</th><th>Break</th><th>Time In</th><th>Time Out</th><th class="num">Hours</th><th class="num">Shift</th><th class="num">Week</th>
+      </tr></thead>
+      <tbody>${body||`<tr><td colspan="11" class="empty">No entries this period.</td></tr>`}</tbody>
+    </table></div>
+    <div class="hint" style="margin-top:8px">Click <b>E</b>, <b>M</b>, or <b>O</b> in the header to approve every row for that party; or check rows individually. Break codes: <b>u</b> = unpaid meal, <b>p</b> = paid break.</div>
+    ${flagBlock}
+  </div>`;
+}
+
 /* ---------- HOURS: employee list + period timecard ---------- */
 let HOURS=null;
 function ymdD(y){return new Date(y+'T00:00:00Z');}
@@ -1661,7 +1921,7 @@ function sundayOf(y){return ymdAdd(y, -((ymdD(y).getUTCDay()+6)%7));} // Monday 
 function todayYmd(e){return partsInTz(new Date().toISOString(), e.tz).ymd;}
 
 function initHours(){
-  HOURS={empId:null, preset:'thispp', start:'', stop:'', sort:'dept', search:'', listOpen:false};
+  HOURS={empId:null, preset:'thispp', start:'', stop:'', sort:'dept', search:'', listOpen:false, tab:'hours', schedWeekends:false};
   const list=sortedEmployees();
   const withData=list.find(e=>DB.punches.some(p=>p.emp===e.id && weekKeyFor(p.ts,e)===currentWeekKey(e)));
   const pick=withData||list[0]||me();
@@ -1696,13 +1956,14 @@ function empListPanel(cfg){
       <i class="ti ti-user-circle"></i><div><b>${e.empId} · ${e.name}</b><span>${e.dept} · ${e.loc}</span></div></button>`;
   });
   return `<div class="emplist"><div class="emplist-head">
-      <label class="sortrow"><span>Sort by</span><select onchange="${cfg.onSort}(this.value)">
+      <label class="sortchip"><span>Sort by</span><select onchange="${cfg.onSort}(this.value)">
         <option value="id" ${cfg.sort==='id'?'selected':''}>Employee ID</option>
         <option value="dept" ${cfg.sort==='dept'?'selected':''}>Department</option>
         <option value="last" ${cfg.sort==='last'?'selected':''}>Last name</option>
         <option value="first" ${cfg.sort==='first'?'selected':''}>First name</option>
         <option value="loc" ${cfg.sort==='loc'?'selected':''}>Location</option></select></label>
-      <input class="emp-search" placeholder="Search name or ID…" value="${(cfg.search||'').replace(/"/g,'&quot;')}" onchange="${cfg.onSearch}(this.value)" onkeydown="if(event.key==='Enter')${cfg.onSearch}(this.value)">
+      <div class="emp-search"><i class="ti ti-search"></i>
+        <input placeholder="Search name or ID…" value="${(cfg.search||'').replace(/"/g,'&quot;')}" onchange="${cfg.onSearch}(this.value)" onkeydown="if(event.key==='Enter')${cfg.onSearch}(this.value)"></div>
       <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
     </div><div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div></div>`;
 }
@@ -1710,6 +1971,8 @@ function hoursSelect(id){ HOURS.empId=id; HOURS.listOpen=false; render(); }
 function toggleHoursList(){ HOURS.listOpen=!HOURS.listOpen; render(); }
 function hoursSort(v){ HOURS.sort=v; render(); }
 function hoursSearch(v){ HOURS.search=v; render(); }
+function hoursTab(v){ HOURS.tab=v; render(); }
+function hoursSchedWeekends(){ HOURS.schedWeekends=!HOURS.schedWeekends; render(); }
 function hoursPreset(v){
   HOURS.preset=v; const e=emp(HOURS.empId)||me(); const t=todayYmd(e); const sun=sundayOf(t);
   if(v==='thispp'){ HOURS.start=payPeriodStart(t); HOURS.stop=ymdAdd(HOURS.start,13); }
@@ -1744,7 +2007,37 @@ function schedBounds(segs){
   if(!segs.length) return null;
   return {start:segs.reduce((a,s)=>Math.min(a,toMin(s.start)),1e9), end:segs.reduce((a,s)=>Math.max(a,toMin(s.end)),0)};
 }
-function dayPunchBounds(empId, ymd){
+// one pass over an employee's punches → { ymd: {any, firstIn, lastOut} } for fast day lookups
+function empPunchIndex(empId){
+  const e=emp(empId); const idx={};
+  DB.punches.filter(p=>p.emp===empId).forEach(p=>{
+    const q=partsInTz(p.ts,e.tz); const m=q.hh*60+q.mm;
+    const d=idx[q.ymd]||(idx[q.ymd]={any:false,ins:[],outs:[]});
+    d.any=true; if(p.type==='in') d.ins.push(m); else if(p.type==='out') d.outs.push(m);
+  });
+  Object.values(idx).forEach(d=>{ d.firstIn=d.ins.length?Math.min(...d.ins):null; d.lastOut=d.outs.length?Math.max(...d.outs):null; });
+  return idx;
+}
+// date auto-occurrences begin accruing: the later of go-live floor and the employee's first punch.
+// null → no punch history yet, so no auto occurrences are inferred at all.
+function trackingStartYmd(empId, idx){
+  idx=idx||empPunchIndex(empId);
+  const ks=Object.keys(idx); const fp=ks.length?ks.sort()[0]:null;
+  const floor=CFG.trackingStart||'';
+  if(fp&&floor) return fp>floor?fp:floor;
+  return fp||floor||null;
+}
+// true if the employee punched at least once in the Mon–Sun week containing ymd.
+// Unapproved-absence points are only inferred in weeks where the person actually clocked in —
+// a week with zero punches means they aren't being tracked by the clock that week (salaried, leave not entered, etc.).
+function weekHasPunch(idx, ymd){
+  if(!idx) return true;
+  let d=sundayOf(ymd);
+  for(let i=0;i<7;i++){ if(idx[d] && idx[d].any) return true; d=ymdAdd(d,1); }
+  return false;
+}
+function dayPunchBounds(empId, ymd, idx){
+  if(idx){ const d=idx[ymd]; return d?{any:d.any,firstIn:d.firstIn,lastOut:d.lastOut}:{any:false,firstIn:null,lastOut:null}; }
   const e=emp(empId);
   const ps=DB.punches.filter(p=>p.emp===empId && partsInTz(p.ts,e.tz).ymd===ymd).sort((a,b)=>new Date(a.ts)-new Date(b.ts));
   const ins=ps.filter(p=>p.type==='in'), outs=ps.filter(p=>p.type==='out');
@@ -1753,12 +2046,16 @@ function dayPunchBounds(empId, ymd){
 }
 function occExcuseKey(emp,ymd,code){return `${emp}|${ymd}|${code}`;}
 function isOccExcused(emp,ymd,code){return !!DB.occExcused[occExcuseKey(emp,ymd,code)];}
-function dayOccurrences(empId, ymd){
+function dayOccurrences(empId, ymd, idx, floor){
+  const today=todayYmd(emp(empId));
+  if(ymd>today) return [];                                        // future day — nothing has happened yet
+  if(floor===undefined) floor=trackingStartYmd(empId, idx);
+  if(!floor || ymd<floor) return [];                              // before this employee was tracked — don't infer absences
   const segs=scheduleFor(empId,ymd); const b=schedBounds(segs); if(!b) return [];
   if(DB.leave.some(l=>l.emp===empId && l.date===ymd)) return []; // approved leave = no points
-  const pb=dayPunchBounds(empId,ymd); const occ=[];
+  const pb=dayPunchBounds(empId,ymd,idx); const occ=[];
   const push=code=>occ.push({code, points:OCC_TYPES[code].points, auto:true, excused:isOccExcused(empId,ymd,code)});
-  if(!pb.any){ push('UA'); return occ; }
+  if(!pb.any){ if(ymd<today && weekHasPunch(idx,ymd)) push('UA'); return occ; }  // absence: only once the day has elapsed AND the person punched that week
   if(pb.firstIn!=null){
     if(pb.firstIn > b.start+CFG.lateMin) push('L');
     else if(pb.firstIn < b.start-CFG.earlyMin) push('CIE');
@@ -1767,9 +2064,10 @@ function dayOccurrences(empId, ymd){
   return occ;
 }
 function periodOccurrences(empId, start, stop){
+  const idx=empPunchIndex(empId); const floor=trackingStartYmd(empId, idx);
   const out=[]; let cur=start;
   while(cur<=stop){
-    dayOccurrences(empId,cur).forEach(o=>out.push({...o, date:cur}));
+    dayOccurrences(empId,cur,idx,floor).forEach(o=>out.push({...o, date:cur}));
     DB.occurrences.filter(m=>m.emp===empId && m.date===cur).forEach(m=>out.push({code:m.code, points:OCC_TYPES[m.code].points, date:cur, auto:false, id:m.id, note:m.note, excused:isOccExcused(empId,cur,m.code)}));
     cur=ymdAdd(cur,1);
   }
@@ -1777,11 +2075,9 @@ function periodOccurrences(empId, start, stop){
 }
 function rollingPoints(empId){
   const today=todayYmd(emp(empId)); const cutoff=ymdAdd(today,-365);
-  let pts=0;
-  const dates=new Set();
-  DB.punches.filter(p=>p.emp===empId).forEach(p=>dates.add(partsInTz(p.ts,emp(empId).tz).ymd));
-  DB.schedules.filter(s=>s.emp===empId).forEach(s=>dates.add(s.date));
-  dates.forEach(d=>{ if(d>=cutoff && d<=today) dayOccurrences(empId,d).forEach(o=>{ if(!o.excused) pts+=o.points; }); });
+  const idx=empPunchIndex(empId); const floor=trackingStartYmd(empId, idx);
+  let pts=0; let cur=floor && floor>cutoff ? floor : cutoff;      // never scan before tracking began
+  while(cur<=today){ dayOccurrences(empId,cur,idx,floor).forEach(o=>{ if(!o.excused) pts+=o.points; }); cur=ymdAdd(cur,1); }
   DB.occurrences.filter(m=>m.emp===empId && m.date>=cutoff && m.date<=today && !isOccExcused(empId,m.date,m.code)).forEach(m=>pts+=OCC_TYPES[m.code].points);
   return Math.round(pts*100)/100;
 }
@@ -1813,6 +2109,15 @@ function leavePeriod(empId,start,stop){
   DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
   return t;
 }
+// approved leave dated in the future (not yet taken) — subtracted from Available so upcoming PTO shows today
+function committedLeave(empId){
+  const today=todayYmd(emp(empId));
+  const t={PTO:0,Sick:0,Holiday:0,Bereavement:0};
+  DB.leave.filter(l=>l.emp===empId && l.date>today).forEach(l=>{ t[l.type]=(t[l.type]||0)+l.hours; });
+  return t;
+}
+// signed h:mm (handles negative Available when over-committed)
+function h2s(n){ return n<0 ? '-'+h2(-n) : h2(n); }
 
 /* ---------- TIME-OFF APPROVAL QUEUE (requests from the web clock) ---------- */
 function ptoScope(){ const u=me(); if(u.role==='hr') return DB.ptoRequests; const ids=new Set(u.manages||[]); return DB.ptoRequests.filter(r=>ids.has(r.emp)); }
@@ -2014,22 +2319,31 @@ function renderPayModal(){
 }
 
 // per-employee attendance + leave section for the Hours detail
-function attendanceSection(empId, start, stop){
+let SECOPEN={};
+function toggleSec(k){ SECOPEN[k]=!SECOPEN[k]; render(); }
+function collSection(key, icon, title, summary, bodyFn){
+  const open=!!SECOPEN[key];
+  return `<div class="card collapsible ${open?'open':''}">
+    <button class="sec-head" onclick="toggleSec('${key}')">
+      <i class="ti ${icon} sec-icon"></i>
+      <div class="sec-title">${title}</div>
+      <div class="sec-sum">${summary}</div>
+      <i class="ti ti-chevron-down sec-chev"></i>
+    </button>
+    ${open?`<div class="sec-body">${bodyFn()}</div>`:''}
+  </div>`;
+}
+// --- Hours-detail: Occurrences tab ---
+function occSection(empId, start, stop){
   const occ=periodOccurrences(empId,start,stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const periodPts=Math.round(occ.reduce((s,o)=>s+(o.excused?0:o.points),0)*100)/100;
   const roll=rollingPoints(empId); const tier=disciplineTier(roll);
-  const lv=DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).sort((a,b)=>a.date.localeCompare(b.date));
-  const lt=leavePeriod(empId,start,stop);
-  const prem=premiumHours(empId,start,stop);
-  const premDays=mealPremiumDays(empId,start,stop);
-  const premList=DB.premiums.filter(p=>p.emp===empId && p.date>=start && p.date<=stop).sort((a,b)=>a.date.localeCompare(b.date));
-  const holHrs=holidayHours(empId,start,stop);
-  return `<div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-      <h2 style="margin:0"><i class="ti ti-calendar-stats"></i> Attendance</h2>
-      <div style="text-align:right"><div style="font-size:12px;color:var(--muted)">Rolling 12-mo points</div>
-        <div><b style="font-size:20px">${roll}</b> <span class="pill ${tier.tone}">${tier.label}</span></div></div>
-    </div>
-    <div style="margin-top:12px">${occ.length? `<table class="wtable"><thead><tr><th>Date</th><th>Occurrence</th><th class="num">Pts</th><th></th></tr></thead><tbody>
+  return `
+    <div class="reqbanner info"><div class="reqrow"><i class="ti ti-calendar-stats"></i>
+      <div><b>Standing: ${tier.label} <span class="pill ${tier.tone}">${tier.band} pts</span></b>
+      <div class="reqmeta"><b>${periodPts}</b> pts this period · <b>${roll}</b> pts rolling 12 months (drives standing). Absences count only in weeks the employee clocked in; days with approved leave are waived.</div></div>
+      <button class="btn ghost sm" onclick="openOcc('${empId}')"><i class="ti ti-plus"></i> Record occurrence</button></div></div>
+    ${occ.length? `<table class="wtable" style="margin-top:12px"><thead><tr><th>Date</th><th>Occurrence</th><th class="num">Pts</th><th></th></tr></thead><tbody>
       ${occ.map(o=>{const dt=ymdD(o.date);const dl=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
         return `<tr class="${o.excused?'occ-excused':''}"><td>${dl}</td>
           <td>${OCC_TYPES[o.code].label} <span class="src">${o.code}</span>${o.auto?'':' <span class="src" style="background:var(--warnbg);color:var(--warn)">manual</span>'}${o.excused?' <em style="color:var(--ok)">· excused</em>':''}</td>
@@ -2037,32 +2351,143 @@ function attendanceSection(empId, start, stop){
           <td style="text-align:right;white-space:nowrap">
             <button class="excuse-btn" onclick="toggleOccExcuse('${empId}','${o.date}','${o.code}')">${o.excused?'reinstate':'excuse'}</button>
             ${o.auto?'':`<button class="excuse-btn" onclick="deleteOcc('${o.id}')">delete</button>`}</td></tr>`;}).join('')}
-    </tbody></table>` : `<div class="empty">No attendance occurrences this period.</div>`}
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn ghost sm" onclick="openOcc('${empId}')"><i class="ti ti-plus"></i> Record occurrence</button>
-    </div>
-    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <h2 style="margin:0;font-size:14px"><i class="ti ti-cash-banknote"></i> Premiums (paid at regular rate)</h2>
-      <div class="hint">Meal (auto) ${h2(prem.auto)} · Manual ${h2(prem.manual)} · <b>Total ${h2(prem.total)}</b></div>
-    </div>
-    <div class="hint" style="margin-top:6px">${premDays.length?`Auto meal premium on: ${premDays.map(d=>ymdD(d).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})).join(', ')}. Excuse the meal flag on a timecard to remove a false positive.`:'No auto meal premiums this period.'}</div>
-    ${premList.length?`<div style="margin-top:8px">${premList.map(p=>`<div class="listrow"><div><b>${h2(p.hours)} · ${p.reason}</b><div class="listsub">${ymdD(p.date).toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})} · by ${p.by}</div></div><button class="excuse-btn" onclick="deletePremium('${p.id}')">delete</button></div>`).join('')}</div>`:''}
-    <button class="btn ghost sm" style="margin-top:10px" onclick="openPremium('${empId}')"><i class="ti ti-plus"></i> Add premium (rest break / manual)</button>
-    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h2 style="margin:0;font-size:14px"><i class="ti ti-beach"></i> Paid hours (PTO / Sick / Holiday)</h2>
-      <div class="hint">PTO ${h2(lt.PTO+lt.Bereavement)} · Sick ${h2(lt.Sick)} · Holiday ${h2(holHrs)}</div>
-    </div>
-    <div class="hint" style="margin-top:6px">PTO/Sick balances are maintained in the HR Hub; hours entered here feed payroll.</div>
-    <div style="margin-top:10px">${lv.length? lv.map(l=>{const dt=ymdD(l.date);
-      return `<div class="listrow"><div><b>${l.type} · ${h2(l.hours)}</b><div class="listsub">${dt.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'})}${l.note?' · '+l.note:''}</div></div>
-        <button class="excuse-btn" onclick='openLeaveEdit(${JSON.stringify(l).replace(/'/g,"&#39;")})'>edit</button></div>`;}).join('')
-      : `<div class="empty">No paid-leave entries this period.</div>`}
-    </div>
-    <button class="btn ghost sm" style="margin-top:10px" onclick="openLeave('${empId}')"><i class="ti ti-plus"></i> Add PTO / Sick / Holiday</button>
+    </tbody><tfoot><tr><td colspan="2" style="text-align:right"><b>Period total</b></td><td class="num"><b>${periodPts}</b></td><td></td></tr></tfoot></table>
+    <div class="hint" style="margin-top:8px"><i class="ti ti-info-circle"></i> Points here cover the selected period only. Standing (${roll} pts) is the 12-month rolling total across all periods — excused occurrences count as 0 in both.</div>`
+      : `<div class="empty" style="margin-top:12px">No attendance occurrences this period.</div>`}`;
+}
+
+// --- Hours-detail: Accruals tab (available PTO / Sick, net of committed future leave) ---
+function accrualsTab(empId, start, stop){
+  const e=emp(empId);
+  const pAll=e.pto?.allot||0, pUse=e.pto?.used||0, sAll=e.sick?.allot||0, sUse=e.sick?.used||0;
+  const com=committedLeave(empId);
+  const row=(name,icon,all,used,committed)=>{
+    const avail=all-used-committed;
+    return `<tr>
+      <td><i class="ti ${icon}" style="color:var(--muted)"></i> <b>${name}</b></td>
+      <td class="num">${h2(all)}</td>
+      <td class="num">${h2(used)}</td>
+      <td class="num">${committed?h2(committed):'—'}</td>
+      <td class="num"><b style="color:${avail<0?'var(--bad)':'var(--navy)'}">${h2s(avail)}</b></td></tr>`;
+  };
+  const empty=(pAll+pUse+sAll+sUse)===0;
+  return `<div class="card">
+    <table class="wtable"><thead><tr><th>Type</th><th class="num">Allotted</th><th class="num">Used YTD</th><th class="num">Committed</th><th class="num">Available</th></tr></thead>
+    <tbody>
+      ${row('PTO','ti-beach',pAll,pUse,com.PTO+com.Bereavement)}
+      ${row('Sick','ti-first-aid-kit',sAll,sUse,com.Sick)}
+    </tbody></table>
+    <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> ${empty?'No balances synced yet for this employee — ':''}Allotted &amp; Used YTD sync from the HR Hub PTO tracker. <b>Committed</b> = approved leave dated in the future; Available already subtracts it, so PTO booked months ahead is reflected today. Times shown as h:mm.</div>
   </div>`;
+}
+
+// --- Hours-detail: this employee's effective schedule for the period ---
+function hoursSchedGrid(empId, start, stop){
+  const wknd=!!HOURS.schedWeekends; const cols=wknd?7:5;
+  let cur=sundayOf(start); const blocks=[];
+  while(cur<=stop){
+    const days=daysOfWeek(cur,wknd);
+    const label=`${dayLabel(days[0]).slice(0,5)} - ${dayLabel(days[days.length-1]).slice(0,5)}`;
+    blocks.push(`<div class="week-label">${label}</div>
+      <div class="week-grid" style="grid-template-columns:repeat(${cols},1fr)">
+        ${days.map(ymd=>{
+          const segs=scheduleFor(empId,ymd);
+          const tot=segs.reduce((s,x)=>s+segMin(x.start,x.end),0);
+          const chips=segs.map(s=> s.date
+            ? segChip(s,'overrides')
+            : `<div class="seg-chip" style="cursor:default"><b>${fmt12(s.start)}–${fmt12(s.end)}</b><span>${s.jobCode||''} · ${h2(segMin(s.start,s.end)/60)} · template</span></div>`).join('');
+          return `<div class="day-cell"><div class="day-head"><span>${dayLabel(ymd)}</span><b>${h2(tot/60)}</b></div>
+            <div class="day-body">${chips}
+            <button class="add-seg" onclick="openSched('${empId}',{mode:'overrides',date:'${ymd}'})"><i class="ti ti-plus"></i> Add</button></div></div>`;
+        }).join('')}
+      </div>`);
+    cur=ymdAdd(cur,7);
+  }
+  return `<div class="sched-note">Effective schedule — dated overrides shown over the recurring template. <b>Add</b> creates a dated override; the recurring template is managed on the all-employee <b>Schedules</b> screen.</div>${blocks.join('')}`;
+}
+
+// --- Download the current employee's period timecard as a PDF ---
+function downloadHoursPDF(){
+  if(!HOURS||!HOURS.empId) return;
+  if(!window.jspdf){ toast('PDF library still loading — try again'); return; }
+  const e=emp(HOURS.empId); const start=HOURS.start, stop=HOURS.stop;
+  const pd=buildPeriod(e.id,start,stop); const lt=leavePeriod(e.id,start,stop);
+  const holHrs=holidayHours(e.id,start,stop); const roll=rollingPoints(e.id); const tier=disciplineTier(roll);
+  const rows=[];
+  pd.weeks.forEach(wk=>buildTimecard(e.id,wk).days.forEach(d=>{
+    const io=d.punches.map(p=>fmtTime(p.ts,e)+' '+labelType(p.type)).join(', ');
+    rows.push([d.ymd, io||'—', d.hrs.toFixed(2), (d.exceptions||[]).join('; ')]);
+  }));
+  DB.leave.filter(l=>l.emp===e.id && l.date>=start && l.date<=stop).sort((a,b)=>a.date.localeCompare(b.date))
+    .forEach(l=>rows.push([l.date, `${l.type} (paid)`, l.hours.toFixed(2), l.note||'']));
+  const {jsPDF}=window.jspdf; const doc=new jsPDF();
+  doc.setFontSize(14); doc.text('WS Display — Timecard',14,16);
+  doc.setFontSize(10); doc.text(`${e.name}  (ID ${e.empId})  ·  ${e.dept}  ·  ${e.loc}`,14,23);
+  doc.text(`Period ${start} – ${stop}`,14,29);
+  doc.autoTable({head:[['Date','Punches / Entry','Hours','Flags']],body:rows,startY:34,styles:{fontSize:8},headStyles:{fillColor:[15,30,61]}});
+  const y=(doc.lastAutoTable?doc.lastAutoTable.finalY:40)+8;
+  doc.setFontSize(10);
+  doc.text(`Reg ${pd.reg.toFixed(2)}    OT1 ${pd.ot.toFixed(2)}    OT2 ${pd.dt.toFixed(2)}    Total ${pd.total.toFixed(2)}`,14,y);
+  doc.text(`PTO ${(lt.PTO+lt.Bereavement).toFixed(2)}    Sick ${lt.Sick.toFixed(2)}    Holiday ${holHrs.toFixed(2)}    Points ${roll} (${tier.label})`,14,y+6);
+  doc.save(`timecard_${e.empId}_${start}.pdf`);
+}
+
+// generic browser download for text/CSV
+function dlFile(name, text, mime){
+  const blob=new Blob([text], {type:(mime||'text/plain')+';charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+function csvCell(v){ v=(v==null?'':String(v)); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function csvOf(rows){ return rows.map(r=>r.map(csvCell).join(',')).join('\r\n'); }
+
+function downloadHoursCSV(){
+  if(!HOURS||!HOURS.empId) return;
+  const e=emp(HOURS.empId); const start=HOURS.start, stop=HOURS.stop;
+  const pd=buildPeriod(e.id,start,stop); const lt=leavePeriod(e.id,start,stop); const holHrs=holidayHours(e.id,start,stop);
+  const rows=[['Date','Punches / Entry','Hours','Flags']];
+  pd.weeks.forEach(wk=>buildTimecard(e.id,wk).days.forEach(d=>{
+    const io=d.punches.map(p=>fmtTime(p.ts,e)+' '+labelType(p.type)).join(' | ');
+    rows.push([d.ymd, io||'—', d.hrs.toFixed(2), (d.exceptions||[]).join('; ')]);
+  }));
+  DB.leave.filter(l=>l.emp===e.id && l.date>=start && l.date<=stop).sort((a,b)=>a.date.localeCompare(b.date))
+    .forEach(l=>rows.push([l.date, `${l.type} (paid)`, l.hours.toFixed(2), l.note||'']));
+  rows.push([]);
+  rows.push(['Regular',pd.reg.toFixed(2)],['OT1',pd.ot.toFixed(2)],['OT2',pd.dt.toFixed(2)],['Total',pd.total.toFixed(2)]);
+  rows.push(['PTO',(lt.PTO+lt.Bereavement).toFixed(2)],['Sick',lt.Sick.toFixed(2)],['Holiday',holHrs.toFixed(2)]);
+  dlFile(`timecard_${e.empId}_${start}.csv`, csvOf(rows), 'text/csv');
+}
+
+function downloadOccPDF(){
+  if(!HOURS||!HOURS.empId) return;
+  if(!window.jspdf){ toast('PDF library still loading — try again'); return; }
+  const e=emp(HOURS.empId); const start=HOURS.start, stop=HOURS.stop;
+  const occ=periodOccurrences(e.id,start,stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const roll=rollingPoints(e.id); const tier=disciplineTier(roll);
+  const periodPts=Math.round(occ.reduce((s,o)=>s+(o.excused?0:o.points),0)*100)/100;
+  const rows=occ.map(o=>[o.date, OCC_TYPES[o.code].label+(o.excused?' (excused)':''), o.code, o.auto?'auto':'manual', o.excused?'0':String(o.points)]);
+  const {jsPDF}=window.jspdf; const doc=new jsPDF();
+  doc.setFontSize(14); doc.text('WS Display — Attendance Occurrences',14,16);
+  doc.setFontSize(10); doc.text(`${e.name}  (ID ${e.empId})  ·  ${e.dept}`,14,23);
+  doc.text(`Period ${start} – ${stop}`,14,29);
+  doc.text(`Standing: ${tier.label}  ·  ${roll} pts rolling 12 mo`,14,35);
+  doc.autoTable({head:[['Date','Occurrence','Code','Source','Pts']],body:rows.length?rows:[['—','No occurrences','','','']],startY:40,styles:{fontSize:8},headStyles:{fillColor:[15,30,61]}});
+  const y=(doc.lastAutoTable?doc.lastAutoTable.finalY:46)+8;
+  doc.setFontSize(10); doc.text(`Period total: ${periodPts} pts     Rolling 12-mo: ${roll} pts`,14,y);
+  doc.save(`occurrences_${e.empId}_${start}.pdf`);
+}
+function downloadOccCSV(){
+  if(!HOURS||!HOURS.empId) return;
+  const e=emp(HOURS.empId); const start=HOURS.start, stop=HOURS.stop;
+  const occ=periodOccurrences(e.id,start,stop).sort((a,b)=>a.date.localeCompare(b.date));
+  const periodPts=Math.round(occ.reduce((s,o)=>s+(o.excused?0:o.points),0)*100)/100;
+  const rows=[['Date','Occurrence','Code','Points','Excused','Source']];
+  occ.forEach(o=>rows.push([o.date, OCC_TYPES[o.code].label, o.code, o.excused?0:o.points, o.excused?'yes':'no', o.auto?'auto':'manual']));
+  rows.push([]);
+  rows.push(['Period total','','',periodPts]);
+  rows.push(['Rolling 12-mo','','',rollingPoints(e.id)]);
+  dlFile(`occurrences_${e.empId}_${start}.csv`, csvOf(rows), 'text/csv');
 }
 
 function viewHours(){
@@ -2085,7 +2510,7 @@ function viewHours(){
 
   const listPanel=`<div class="emplist">
     <div class="emplist-head">
-      <label class="sortrow"><span>Sort by</span>
+      <label class="sortchip"><span>Sort by</span>
         <select onchange="hoursSort(this.value)">
           <option value="dept" ${HOURS.sort==='dept'?'selected':''}>Department</option>
           <option value="last" ${HOURS.sort==='last'?'selected':''}>Last name</option>
@@ -2093,8 +2518,9 @@ function viewHours(){
           <option value="id" ${HOURS.sort==='id'?'selected':''}>Employee ID</option>
           <option value="loc" ${HOURS.sort==='loc'?'selected':''}>Location</option>
         </select></label>
-      <input class="emp-search" placeholder="Search name or ID…" value="${(HOURS.search||'').replace(/"/g,'&quot;')}"
-             onchange="hoursSearch(this.value)" onkeydown="if(event.key==='Enter')hoursSearch(this.value)">
+      <div class="emp-search"><i class="ti ti-search"></i>
+        <input placeholder="Search name or ID…" value="${(HOURS.search||'').replace(/"/g,'&quot;')}"
+               onchange="hoursSearch(this.value)" onkeydown="if(event.key==='Enter')hoursSearch(this.value)"></div>
       <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
     </div>
     <div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div>
@@ -2102,29 +2528,21 @@ function viewHours(){
 
   // right detail
   let detail;
-  if(!HOURS.empId){ detail=`<div class="card"><button class="btn ghost sm" onclick="toggleHoursList()"><i class="ti ti-users"></i> ${HOURS.listOpen?'Hide list':'Employees'}</button><div class="empty">Select an employee.</div></div>`; }
+  if(!HOURS.empId){ detail=`<div class="card"><div class="empty">Select an employee from the list.</div></div>`; }
   else{
     const e=emp(HOURS.empId); const pd=buildPeriod(e.id, HOURS.start, HOURS.stop);
     const idx=list.findIndex(x=>x.id===e.id);
+    const tab=HOURS.tab||'hours';
+    const _lt=leavePeriod(e.id,HOURS.start,HOURS.stop); const _hol=holidayHours(e.id,HOURS.start,HOURS.stop);
+    const leaveTot=_lt.PTO+_lt.Sick+_lt.Bereavement+_hol;
     const totals=`<div class="totalsbar">
       <div class="tcell"><span>Regular</span><b>${h2(pd.reg)}</b></div>
       <div class="tcell"><span>OT1</span><b>${h2(pd.ot)}</b></div>
       <div class="tcell"><span>OT2</span><b>${h2(pd.dt)}</b></div>
       <div class="tcell total"><span>Total</span><b>${h2(pd.total)}</b></div>
+      <div class="tcell leave"><span>Leave</span><b>${h2(leaveTot)}</b></div>
     </div>`;
-    detail=`
-    <div class="detail-head">
-      <button class="btn ghost sm" onclick="toggleHoursList()" title="Show/hide employee list"><i class="ti ti-users"></i> ${HOURS.listOpen?'Hide list':'Employees'} <span class="src">${list.length}</span></button>
-      <div class="detail-nav">
-        <button class="iconbtn" onclick="hoursNav(-1)" ${idx<=0?'disabled':''}><i class="ti ti-chevron-up"></i></button>
-        <button class="iconbtn" onclick="hoursNav(1)" ${idx>=list.length-1?'disabled':''}><i class="ti ti-chevron-down"></i></button>
-      </div>
-      <div class="detail-who"><b>${e.name}</b><span>ID ${e.empId} · ${e.dept} · ${e.loc} · ${TZ[e.tz]}</span></div>
-      <div style="flex:1"></div>
-      ${me().role==='hr'?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve period &amp; send to Payroll</button>`:''}
-    </div>
-    ${me().role==='hr'?(()=>{const b=batchForPeriod(HOURS.start,HOURS.stop); if(b&&b.status==='sent') return `<div class="reqbanner info"><div class="reqrow"><i class="ti ti-cash"></i><div><b>Period sent to Payroll</b><div class="reqmeta">${new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} by ${b.by}${b.version>1?` · v${b.version}`:''} — timecards are locked.</div></div><button class="btn ghost sm" onclick="reopenPeriod('${HOURS.start}','${HOURS.stop}')"><i class="ti ti-lock-open"></i> Reopen</button></div></div>`; return '';})():''}
-    <div class="periodbar">
+    const periodSel=`
       <div class="field"><label>Period</label>
         <select onchange="hoursPreset(this.value)">
           <option value="thispp" ${HOURS.preset==='thispp'?'selected':''}>This pay period</option>
@@ -2135,16 +2553,59 @@ function viewHours(){
           <option value="custom" ${HOURS.preset==='custom'?'selected':''}>Custom</option>
         </select></div>
       <div class="field"><label>Start</label><input type="date" value="${HOURS.start}" onchange="hoursDate('start',this.value)"></div>
-      <div class="field"><label>Stop</label><input type="date" value="${HOURS.stop}" onchange="hoursDate('stop',this.value)"></div>
-      <div style="flex:1"></div>
-      ${totals}
+      <div class="field"><label>Stop</label><input type="date" value="${HOURS.stop}" onchange="hoursDate('stop',this.value)"></div>`;
+
+    let body;
+    if(tab==='hours'){
+      body=`<div class="periodbar">${periodSel}<div style="flex:1"></div>${totals}</div>
+        ${renderPeriodTimecard(e.id, HOURS.start, HOURS.stop, me().role==='manager'?'manager':'hr')}`;
+    } else if(tab==='sched'){
+      body=`<div class="periodbar">${periodSel}<div style="flex:1"></div>
+        <label class="wk-toggle"><input type="checkbox" ${HOURS.schedWeekends?'checked':''} onchange="hoursSchedWeekends()"> Display weekends</label></div>
+        ${hoursSchedGrid(e.id, HOURS.start, HOURS.stop)}`;
+    } else if(tab==='accruals'){
+      body=accrualsTab(e.id, HOURS.start, HOURS.stop);
+    } else { // occurrences
+      body=`<div class="periodbar">${periodSel}</div><div class="card">${occSection(e.id, HOURS.start, HOURS.stop)}</div>`;
+    }
+
+    detail=`
+    <div class="subtabs">
+      <button class="subtab ${tab==='hours'?'on':''}" onclick="hoursTab('hours')">Hours</button>
+      <button class="subtab ${tab==='sched'?'on':''}" onclick="hoursTab('sched')">Schedules</button>
+      <button class="subtab ${tab==='accruals'?'on':''}" onclick="hoursTab('accruals')">Accruals</button>
+      <button class="subtab ${tab==='occ'?'on':''}" onclick="hoursTab('occ')">Occurrences</button>
     </div>
-    ${pd.weeks.map(wk=>renderTimecard(e.id, wk, me().role==='manager'?'manager':'hr')).join('')}
-    ${attendanceSection(e.id, HOURS.start, HOURS.stop)}`;
+    <div class="detail-head">
+      <div class="detail-nav">
+        <button class="iconbtn" onclick="hoursNav(-1)" ${idx<=0?'disabled':''}><i class="ti ti-chevron-up"></i></button>
+        <button class="iconbtn" onclick="hoursNav(1)" ${idx>=list.length-1?'disabled':''}><i class="ti ti-chevron-down"></i></button>
+      </div>
+      <div class="detail-who"><b>${e.name}</b><span>ID ${e.empId} · ${e.dept} · ${e.loc} · ${TZ[e.tz]}</span></div>
+      <div style="flex:1"></div>
+      <details class="dl-menu">
+        <summary class="btn ghost sm"><i class="ti ti-download"></i> Download</summary>
+        <div class="dl-pop">
+          ${tab==='occ'
+            ? `<div class="dl-lbl">Occurrences</div>
+               <button onclick="downloadOccPDF();this.closest('details').removeAttribute('open')">PDF</button>
+               <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>`
+            : `<div class="dl-lbl">Hours — this period</div>
+               <button onclick="downloadHoursPDF();this.closest('details').removeAttribute('open')">PDF</button>
+               <button onclick="downloadHoursCSV();this.closest('details').removeAttribute('open')">CSV</button>
+               <div class="dl-lbl" style="margin-top:4px;border-top:1px solid var(--line);padding-top:6px">Occurrences</div>
+               <button onclick="downloadOccPDF();this.closest('details').removeAttribute('open')">PDF</button>
+               <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>`}
+        </div>
+      </details>
+      ${me().role==='hr'?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve &amp; send to Payroll</button>`:''}
+    </div>
+    ${me().role==='hr'?(()=>{const b=batchForPeriod(HOURS.start,HOURS.stop); if(b&&b.status==='sent') return `<div class="reqbanner info"><div class="reqrow"><i class="ti ti-cash"></i><div><b>Period sent to Payroll</b><div class="reqmeta">${new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} by ${b.by}${b.version>1?` · v${b.version}`:''} — timecards are locked.</div></div><button class="btn ghost sm" onclick="reopenPeriod('${HOURS.start}','${HOURS.stop}')"><i class="ti ti-lock-open"></i> Reopen</button></div></div>`; return '';})():''}
+    ${body}`;
   }
 
-  return `<div class="pagehead"><div><h1>Hours</h1><p>Select an employee to review and finalize their timecard.</p></div></div>
-    <div class="hours-layout ${HOURS.listOpen?'':'collapsed'}">${HOURS.listOpen?listPanel:''}<div class="hours-detail">${detail}</div></div>`;
+  return `<div class="pagehead"><div><h1>Individual Hours</h1><p>Review and finalize timecards by employee.</p></div></div>
+    <div class="hours-layout">${listPanel}<div class="hours-detail">${detail}</div></div>`;
 }
 
 /* ---------- SCHEDULES: weekly grid (overrides + recurring) ---------- */
@@ -2485,7 +2946,7 @@ function viewReports(){
 }
 
 /* ---------- CONFIGURATION: pay period, thresholds, holidays ---------- */
-function cfgSet(f,v){ CFG[f]=(f==='payAnchor')?v:(+v||0); saveStore(); if(HOURS&&HOURS.preset&&HOURS.preset.includes('pp')) hoursPreset(HOURS.preset); toast('Saved'); render(); }
+function cfgSet(f,v){ CFG[f]=(f==='payAnchor'||f==='trackingStart')?v:(+v||0); saveStore(); if(HOURS&&HOURS.preset&&HOURS.preset.includes('pp')) hoursPreset(HOURS.preset); toast('Saved'); render(); }
 let HEDIT=null;
 function openHoliday(id){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;
   const h=id?DB.holidays.find(x=>x.id===id):null;
@@ -2536,8 +2997,10 @@ function viewConfig(){
         <div class="field"><label>Clock-in-early before (min)</label><input type="number" min="0" value="${CFG.earlyMin}" onchange="cfgSet('earlyMin',this.value)"></div>
         <div class="field"><label>Leaving-early before (min)</label><input type="number" min="0" value="${CFG.leaveMin}" onchange="cfgSet('leaveMin',this.value)"></div>
         <div class="field"><label>Duplicate-punch window (min)</label><input type="number" min="0" value="${CFG.dedupMin}" onchange="cfgSet('dedupMin',this.value)"></div>
+        <div class="field"><label>Attendance tracking start (go-live)</label><input type="date" value="${CFG.trackingStart||''}" onchange="cfgSet('trackingStart',this.value)"></div>
       </div>
       <div class="hint" style="margin-top:8px">Duplicate punches of the same type within this window are merged — the latest source wins.</div>
+      <div class="hint" style="margin-top:4px">Attendance points don't accrue before the go-live date. Leave it blank to start from each employee's first punch. Unapproved absences are only counted in weeks the employee actually clocked in.</div>
     </div>
     <div class="card" style="grid-column:1/-1">
       <div style="display:flex;justify-content:space-between;align-items:center">

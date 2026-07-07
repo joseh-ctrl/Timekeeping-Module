@@ -522,6 +522,8 @@ const Store = (() => {
   if (enabled) sb = window.supabase.createClient(SUPA_URL, SUPA_ANON_KEY); // persisted session (HR/managers stay signed in)
   const inEmp = r => ({ id:r.id, name:r.name, empId:r.emp_id, loc:r.state, dept:r.dept, tz:r.tz, mgr:r.manager_id,
     role:r.role, rate:+r.rate||0, webPunch:r.web_punch, remote:r.remote, email:r.email,
+    hireDate:r.hire_date||null, leadership:!!r.leadership, ptoEligible:r.pto_eligible!==false,
+    rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null,
     pto:{allot:+r.pto_allot||0,used:+r.pto_used||0}, sick:{allot:+r.sick_allot||0,used:+r.sick_used||0} });
   const inPunch = r => ({ id:r.id, emp:r.employee_id, ts:r.ts, type:r.type, source:r.source, editedBy:r.edited_by });
   const inReq = r => ({ id:r.id, emp:r.employee_id, weekKey:r.week_key, kind:r.kind, targetId:r.target_punch_id,
@@ -563,7 +565,7 @@ const Store = (() => {
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc };
     },
-    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role'};
+    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date'};
       const row={}; Object.keys(patch).forEach(k=>row[m[k]||k]=patch[k]); return sb.from('employees').update(row).eq('id',id); },
     addPunch(p){ return enabled ? sb.from('punches').insert({id:p.id,employee_id:p.emp,ts:p.ts,type:p.type,source:p.source||'manual',edited_by:p.editedBy}) : null; },
     editPunch(p){ return enabled ? sb.from('punches').update({ts:p.ts,type:p.type,source:'manual',edited_by:p.editedBy}).eq('id',p.id) : null; },
@@ -683,8 +685,13 @@ let AUTHED = false;
    table `tk_employees`, `tk_punches`, `tk_timecards`.
 ============================================================ */
 const TZ = {
-  'America/Los_Angeles':'Pacific (CA)',
-  'America/New_York':'Eastern (PA)'
+  'America/Los_Angeles':'Pacific',
+  'America/Denver':'Mountain',
+  'America/Phoenix':'Arizona',
+  'America/Chicago':'Central',
+  'America/New_York':'Eastern',
+  'America/Anchorage':'Alaska',
+  'Pacific/Honolulu':'Hawaii'
 };
 const OT_RULES = {
   CA:{label:'California (daily 8/12 + weekly 40)', daily:true, ot:8, dt:12, weekly:40},
@@ -692,22 +699,71 @@ const OT_RULES = {
 };
 // Rules derive from the employee's STATE (meal/break law + overtime). Timezone is separate.
 const STATE_RULES = {
-  CA:{label:'California', daily:true, ot:8, dt:12, weekly:40, mealLaw:true},   // meal before end of 5th hour
-  PA:{label:'Pennsylvania', daily:false, weekly:40, mealLaw:false}            // federal: weekly OT only, no state meal mandate
+  AL:{label:'Alabama', daily:false, weekly:40, mealLaw:false},
+  AK:{label:'Alaska', daily:false, weekly:40, mealLaw:false},
+  AZ:{label:'Arizona', daily:false, weekly:40, mealLaw:false},
+  AR:{label:'Arkansas', daily:false, weekly:40, mealLaw:false},
+  CA:{label:'California', daily:true, ot:8, dt:12, weekly:40, mealLaw:true},   // meal before end of 5th hour; 7th-day OT
+  CO:{label:'Colorado', daily:false, weekly:40, mealLaw:false},
+  CT:{label:'Connecticut', daily:false, weekly:40, mealLaw:false},
+  DE:{label:'Delaware', daily:false, weekly:40, mealLaw:false},
+  DC:{label:'District of Columbia', daily:false, weekly:40, mealLaw:false},
+  FL:{label:'Florida', daily:false, weekly:40, mealLaw:false},
+  GA:{label:'Georgia', daily:false, weekly:40, mealLaw:false},
+  HI:{label:'Hawaii', daily:false, weekly:40, mealLaw:false},
+  ID:{label:'Idaho', daily:false, weekly:40, mealLaw:false},
+  IL:{label:'Illinois', daily:false, weekly:40, mealLaw:false},
+  IN:{label:'Indiana', daily:false, weekly:40, mealLaw:false},
+  IA:{label:'Iowa', daily:false, weekly:40, mealLaw:false},
+  KS:{label:'Kansas', daily:false, weekly:40, mealLaw:false},
+  KY:{label:'Kentucky', daily:false, weekly:40, mealLaw:false},
+  LA:{label:'Louisiana', daily:false, weekly:40, mealLaw:false},
+  ME:{label:'Maine', daily:false, weekly:40, mealLaw:false},
+  MD:{label:'Maryland', daily:false, weekly:40, mealLaw:false},
+  MA:{label:'Massachusetts', daily:false, weekly:40, mealLaw:false},
+  MI:{label:'Michigan', daily:false, weekly:40, mealLaw:false},
+  MN:{label:'Minnesota', daily:false, weekly:40, mealLaw:false},
+  MS:{label:'Mississippi', daily:false, weekly:40, mealLaw:false},
+  MO:{label:'Missouri', daily:false, weekly:40, mealLaw:false},
+  MT:{label:'Montana', daily:false, weekly:40, mealLaw:false},
+  NE:{label:'Nebraska', daily:false, weekly:40, mealLaw:false},
+  NV:{label:'Nevada', daily:false, weekly:40, mealLaw:false},
+  NH:{label:'New Hampshire', daily:false, weekly:40, mealLaw:false},
+  NJ:{label:'New Jersey', daily:false, weekly:40, mealLaw:false},
+  NM:{label:'New Mexico', daily:false, weekly:40, mealLaw:false},
+  NY:{label:'New York', daily:false, weekly:40, mealLaw:false},
+  NC:{label:'North Carolina', daily:false, weekly:40, mealLaw:false},
+  ND:{label:'North Dakota', daily:false, weekly:40, mealLaw:false},
+  OH:{label:'Ohio', daily:false, weekly:40, mealLaw:false},
+  OK:{label:'Oklahoma', daily:false, weekly:40, mealLaw:false},
+  OR:{label:'Oregon', daily:false, weekly:40, mealLaw:false},
+  PA:{label:'Pennsylvania', daily:false, weekly:40, mealLaw:false},
+  RI:{label:'Rhode Island', daily:false, weekly:40, mealLaw:false},
+  SC:{label:'South Carolina', daily:false, weekly:40, mealLaw:false},
+  SD:{label:'South Dakota', daily:false, weekly:40, mealLaw:false},
+  TN:{label:'Tennessee', daily:false, weekly:40, mealLaw:false},
+  TX:{label:'Texas', daily:false, weekly:40, mealLaw:false},
+  UT:{label:'Utah', daily:false, weekly:40, mealLaw:false},
+  VT:{label:'Vermont', daily:false, weekly:40, mealLaw:false},
+  VA:{label:'Virginia', daily:false, weekly:40, mealLaw:false},
+  WA:{label:'Washington', daily:false, weekly:40, mealLaw:false},
+  WV:{label:'West Virginia', daily:false, weekly:40, mealLaw:false},
+  WI:{label:'Wisconsin', daily:false, weekly:40, mealLaw:false},
+  WY:{label:'Wyoming', daily:false, weekly:40, mealLaw:false},
 };
 const STATES = Object.keys(STATE_RULES);
-function ruleFor(e){ return STATE_RULES[e.loc] || STATE_RULES.CA; }
+function ruleFor(e){ return STATE_RULES[e.loc] || {label:'Federal', daily:false, weekly:40, mealLaw:false}; }
 // HR flag overrides (excused exceptions): key `${emp}|${ymd}|${flag}`
 function excuseKey(emp,ymd,flag){ return `${emp}|${ymd}|${flag}`; }
 function isExcused(emp,ymd,flag){ return !!(DB.excused && DB.excused[excuseKey(emp,ymd,flag)]); }
 
 const DB = {
   employees:[
-    {id:'e1', name:'Maria Sanchez',   empId:'735', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:22.00, webPunch:true,  fmt:'12h', weekStart:0},
-    {id:'e2', name:'David Cruz',       empId:'781', loc:'CA', dept:'Warehouse',  tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:24.50, webPunch:false,  fmt:'12h', weekStart:0},
-    {id:'e3', name:'Karen Miller',     empId:'651', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:21.00, webPunch:true, fmt:'12h', weekStart:0},
-    {id:'e4', name:'Adolfo Amaya',     empId:'037', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:20.00, webPunch:false,  fmt:'12h', weekStart:0},
-    {id:'e5', name:'Aileen Arguelles', empId:'112', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:21.50, webPunch:true, fmt:'12h', weekStart:0},
+    {id:'e1', name:'Aileen Arguelles', empId:'37', loc:'CA', dept:'Graphics',   tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:22.00, webPunch:true,  fmt:'12h', weekStart:0, hireDate:'2011-09-19', leadership:false, ptoEligible:true, pto:{used:68}, sick:{used:32}},
+    {id:'e2', name:'Adolfo Amaya',     empId:'735', loc:'CA', dept:'CA Printing', tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:24.50, webPunch:false, fmt:'12h', weekStart:0, hireDate:'2023-02-06', leadership:false, ptoEligible:true, pto:{used:36}, sick:{used:34}},
+    {id:'e3', name:'Karen Estrada',    empId:'723', loc:'CA', dept:'CA - Finishing', tz:'America/Los_Angeles', mgr:'m2', role:'employee', otRule:'CA', rate:21.00, webPunch:true, fmt:'12h', weekStart:0, hireDate:'2022-09-26', leadership:false, ptoEligible:true, pto:{used:12}, sick:{used:8}},
+    {id:'e4', name:'Maria Carmona',    empId:'215', loc:'PA', dept:'PA - Finishing', tz:'America/New_York', mgr:'m2', role:'employee', otRule:'FED', rate:20.00, webPunch:false, fmt:'12h', weekStart:0, hireDate:'2018-12-03', leadership:false, ptoEligible:true, rehire:true, priorSepDate:'2020-07-24', rehireDate:'2020-10-26', pto:{used:24}, sick:{used:8}},
+    {id:'e5', name:'Craig Van Velzer', empId:'178', loc:'HI', dept:'Executive Management', tz:'Pacific/Honolulu', mgr:'m2', role:'employee', otRule:'FED', rate:21.50, webPunch:true, fmt:'12h', weekStart:0, hireDate:'2005-04-01', leadership:true, ptoEligible:true, pto:{used:0}, sick:{used:0}},
     {id:'e6', name:'Angel Coronel',    empId:'065', loc:'CA', dept:'Warehouse',  tz:'America/Los_Angeles', mgr:'m1', role:'employee', otRule:'CA', rate:23.00, webPunch:false,  fmt:'12h', weekStart:0},
     {id:'e7', name:'Bertha Flores',    empId:'078', loc:'PA', dept:'Office',     tz:'America/New_York',    mgr:'m2', role:'employee', otRule:'FED', rate:20.50, webPunch:true, fmt:'12h', weekStart:0},
     {id:'m1', name:'Luis Ramos',       empId:'201', loc:'CA', dept:'Production', tz:'America/Los_Angeles', mgr:'hr', role:'manager',  otRule:'CA', rate:32.00, webPunch:true,  fmt:'12h', weekStart:0},
@@ -1288,6 +1344,7 @@ function render(){
   else if(PUNCH) renderPunchModal();
   else if(PAYVIEW) renderPayModal();
   else if(ACCR) renderAccrualModal();
+  else if(ACCRED) renderAccrEditModal();
   else { host.innerHTML=''; host.classList.remove('show'); }
 }
 
@@ -2095,11 +2152,11 @@ function empListPanel(cfg){
       <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
     </div><div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div></div>`;
 }
-function hoursSelect(id){ ACCR=null; HOURS.empId=id; HOURS.listOpen=false; render(); }
+function hoursSelect(id){ ACCR=null;ACCRED=null; HOURS.empId=id; HOURS.listOpen=false; render(); }
 function toggleHoursList(){ HOURS.listOpen=!HOURS.listOpen; render(); }
 function hoursSort(v){ HOURS.sort=v; render(); }
 function hoursSearch(v){ HOURS.search=v; render(); }
-function hoursTab(v){ ACCR=null; HOURS.tab=v; render(); }
+function hoursTab(v){ ACCR=null;ACCRED=null; HOURS.tab=v; render(); }
 function hoursSchedWeekends(){ HOURS.schedWeekends=!HOURS.schedWeekends; render(); }
 function hoursPreset(v){
   HOURS.preset=v; const e=emp(HOURS.empId)||me(); const t=todayYmd(e); const sun=sundayOf(t);
@@ -2112,7 +2169,7 @@ function hoursPreset(v){
 }
 function hoursDate(field,v){ HOURS[field]=v; HOURS.preset='custom'; render(); }
 function hoursNav(dir){
-  ACCR=null;
+  ACCR=null;ACCRED=null;
   const list=sortedEmployees(); const i=list.findIndex(e=>e.id===HOURS.empId);
   const ni=Math.min(list.length-1, Math.max(0, (i<0?0:i)+dir));
   if(list[ni]){ HOURS.empId=list[ni].id; render(); }
@@ -2509,13 +2566,203 @@ function occSection(empId, start, stop){
       : `<div class="empty" style="margin-top:12px">No attendance occurrences this period.</div>`}`;
 }
 
-// --- Hours-detail: Accruals tab (available PTO / Sick, net of committed future leave) ---
+/* ============================================================
+   TENURE-BASED PTO / SICK ACCRUAL ENGINE
+   Ported verbatim from the HR Hub PTO tracker (Handbook §7.5).
+   Pure functions — compute entitlement, bank, cap, 90-day gate,
+   sick reset, and Jan-1 projection from an employee's hire date.
+   Settings fixed to the operative Hub policy: 8h/day, 40h sick,
+   sick resets Dec 31 (calendar basis).
+============================================================ */
+function ptoHPD(){return 8;}
+function ptoSickHrs(){return 40;}
+function ptoSickBasis(){return 'calendar';}
+const PTO_TIERS_STD = [
+  [0,0,3,null],[1,2,5,10],[3,4,6,10],[5,6,7,10],[7,8,8,12],[9,9,9,12],
+  [10,10,10,15],[11,11,11,15],[12,12,12,15],[13,13,13,20],[14,14,14,20],[15,null,15,20]
+];
+/* Leadership / salaried chart (Leadership-Salaried PTO Chart) */
+const PTO_TIERS_LEADER = [
+  [0,10,10,15],[11,11,11,15],[12,12,12,15],[13,13,13,20],[14,14,14,20],[15,null,15,20]
+];
+/* default / legacy alias */
+const PTO_TIERS = PTO_TIERS_STD;
+/* pick the right chart for an employee (or draft) */
+function ptoTiersFor(emp){ return (emp && emp.leadership) ? PTO_TIERS_LEADER : PTO_TIERS_STD; }
+function ptoParse(s){ if(!s) return null; const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null; const d=new Date(+m[1],+m[2]-1,+m[3]); return isNaN(d)?null:d; }
+function ptoISO(d){ if(!d) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function ptoFmt(s){ const d=(s instanceof Date)?s:ptoParse(s); if(!d) return '—'; return (d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(2); }
+function ptoFmtLong(d){ if(!d) return '—'; return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); }
+function ptoAddDays(d,n){ const x=new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+function ptoAddYears(d,n){ return new Date(d.getFullYear()+n, d.getMonth(), d.getDate()); }
+function ptoDays(a,b){ return Math.floor((b.getTime()-a.getTime())/86400000); }
+function ptoTodayISO(){ const d=new Date(); return ptoISO(d); }
+function ptoWholeYears(from,to){ if(!from||!to) return 0; let y=to.getFullYear()-from.getFullYear(); const anniv=new Date(to.getFullYear(),from.getMonth(),from.getDate()); if(to<anniv) y--; return Math.max(0,y); }
+function ptoTierFor(years, tiers){
+  const tbl = tiers || PTO_TIERS_STD;
+  for(const t of tbl){ if(years>=t[0] && (t[1]==null || years<=t[1])) return {min:t[0],max:t[1],days:t[2],cap:t[3]}; }
+  return {min:0,max:0,days:tbl[0]?tbl[0][2]:0,cap:tbl[0]?tbl[0][3]:null};
+}
+/* PTO days *added* at a given anniversary — the increase over the prior year (not the full tier amount).
+   Standard: year 0 = 3-day base; yr1 +2; yrs 2/4/6/8 +0; yr 3/5/7/9..15 +1; yr 16+ +0.
+   Leadership: year 0 = 10-day base; yrs 1-10 +0; yrs 11-15 +1; yr 16+ +0. */
+function ptoGrantDays(years, tiers){
+  if(years<=0) return ptoTierFor(0, tiers).days;   // base grant at hire
+  return Math.max(0, ptoTierFor(years, tiers).days - ptoTierFor(years-1, tiers).days);
+}
+function ptoASD(emp){
+  const hire=ptoParse(emp.hireDate);
+  if(!emp || !emp.rehire) return {asd:hire, priorDays:0, gapDays:null, startForNinety:hire};
+  const sep=ptoParse(emp.priorSepDate), reh=ptoParse(emp.rehireDate);
+  if(hire&&sep&&reh&&sep>=hire&&reh>=sep){ const pd=ptoDays(hire,sep); return {asd:ptoAddDays(reh,-pd), priorDays:pd, gapDays:ptoDays(sep,reh), startForNinety:reh}; }
+  if(reh) return {asd:reh, priorDays:0, gapDays:null, startForNinety:reh, warn:'Rehire dates incomplete — tenure counted from rehire date only.'};
+  return {asd:hire, priorDays:0, gapDays:null, startForNinety:hire, warn:'Rehire is on but rehire date is missing.'};
+}
+function ptoTotalDaysAt(asd, date, tiers){ return asd ? ptoTierFor(ptoWholeYears(asd,date), tiers).days : 0; }
+function ptoCapHoursAt(asd, date, hpd, tiers){ if(!asd) return null; const t=ptoTierFor(ptoWholeYears(asd,date), tiers); return t.cap==null?null:t.cap*hpd; }
+/* anniversary INCREMENT (hours) that occurs during calendar year `calYear` */
+function ptoIncHoursInCalYear(asd, calYear, eligible, hpd, tiers){
+  if(!asd || !eligible) return 0;
+  const anniv=new Date(calYear, asd.getMonth(), asd.getDate());
+  if(anniv<=asd) return 0;                       // hire year (or earlier) — no anniversary increment
+  const ten=ptoWholeYears(asd, anniv);
+  return ten>=1 ? ptoGrantDays(ten, tiers)*hpd : 0;
+}
+/* advance ONE Jan 1: apply this year's anniversary increment (capped), subtract used,
+   then frontload next year's full lump sum (capped). Returns the new start-of-year state. */
+function ptoYearTransition(asd, bankStart, calYearStartISO, ptoUsed, eligible, hpd, tiers){
+  const cys=ptoParse(calYearStartISO);
+  const nextJan1=new Date(cys.getFullYear()+1,0,1);
+  const inc=ptoIncHoursInCalYear(asd, cys.getFullYear(), eligible, hpd, tiers);
+  const capYE=ptoCapHoursAt(asd, new Date(cys.getFullYear(),11,31), hpd, tiers);
+  const afterAnniv=capYE==null ? (+bankStart+inc) : Math.min(+bankStart+inc, capYE);
+  const rolled=Math.max(0, afterAnniv-(+ptoUsed||0));
+  const lump=eligible ? ptoTotalDaysAt(asd, nextJan1, tiers)*hpd : 0;
+  const capNext=ptoCapHoursAt(asd, nextJan1, hpd, tiers);
+  const newBank=capNext==null ? rolled+lump : Math.min(rolled+lump, capNext);
+  return {bankStart:newBank, calYearStartISO:ptoISO(nextJan1), rolled, lump, added:newBank-rolled, dateISO:ptoISO(nextJan1)};
+}
+/* simulate from hire (no usage) to the start of the calendar year containing `throughISO` */
+function ptoSimulateState(asd, eligible, hpd, throughISO, tiers){
+  if(!asd) return {bankStart:0, calYearStartISO:''};
+  const through=ptoParse(throughISO)||new Date();
+  const janThis=new Date(through.getFullYear(),0,1);
+  let bankStart, calYearStartISO=ptoISO(janThis);
+  if(asd>janThis){
+    // hired this calendar year — only the base hire grant so far (no Jan 1 frontload yet)
+    bankStart = eligible ? ptoGrantDays(0, tiers)*hpd : 0;
+  } else {
+    // established — assume they sit at this year's Jan 1 lump sum, no carried-over rollover
+    bankStart = eligible ? ptoTierFor(ptoWholeYears(asd, janThis), tiers).days*hpd : 0;
+  }
+  return {bankStart, calYearStartISO};
+}
+/* sick benefit-year start (ISO) for the year containing `d` */
+function ptoSickYearStartISO(asd, d){
+  if(ptoSickBasis()==='anniversary'){
+    if(!asd) return ptoISO(new Date(d.getFullYear(),0,1));
+    return ptoISO(ptoAddYears(asd, ptoWholeYears(asd, d)));
+  }
+  return ptoISO(new Date(d.getFullYear(),0,1));   // calendar — resets Jan 1 (sick deleted Dec 31)
+}
+function ptoCompute(emp, asOfISO){
+  const asOf = ptoParse(asOfISO) || new Date();
+  const hire = ptoParse(emp.hireDate);
+  const a = ptoASD(emp);
+  const asd = a.asd, priorDays=a.priorDays, gapDays=a.gapDays, startForNinety=a.startForNinety||hire;
+  const warnings = a.warn ? [a.warn] : [];
+  const hpd = ptoHPD();
+  const eligible = emp.ptoEligible!==false;
+  const tiers = ptoTiersFor(emp);
+
+  const yearsWhole = (asd && asOf) ? ptoWholeYears(asd, asOf) : 0;
+  let monthsDisp = 0;
+  if(asd){ const lastA=ptoAddYears(asd,yearsWhole); monthsDisp = Math.max(0, Math.floor(ptoDays(lastA, asOf)/30.4375)); }
+  const tier = ptoTierFor(yearsWhole, tiers);
+  const grantHours = tier.days*hpd;                       // annual entitlement *level* (cumulative), for display
+  const thisYearGrant = eligible ? ptoGrantDays(yearsWhole, tiers)*hpd : 0;  // hours actually added at the current anniversary
+  const capHours = tier.cap==null? null : tier.cap*hpd;
+  const lastAnniv = asd ? ptoAddYears(asd, yearsWhole) : null;
+  const nextAnniv = asd ? ptoAddYears(asd, yearsWhole+1) : null;
+
+  // 90-day usability
+  const ninetyDate = startForNinety ? ptoAddDays(startForNinety, 90) : null;
+  let ninetySatisfied = false;
+  if(emp.rehire && gapDays!=null && gapDays<365 && priorDays>=90){ ninetySatisfied=true; }
+  const ptoUsable = ninetySatisfied || (ninetyDate && asOf>=ninetyDate);
+
+  // ── PTO bank (auto-maintained: bankStart = balance right after this calendar year's Jan 1 frontload) ──
+  let bankStart = +emp.bankStart;
+  if(emp.bankStart==null){ bankStart = ptoSimulateState(asd, eligible, hpd, asOfISO, tiers).bankStart; }
+  const calYearStart = ptoParse(emp.calYearStart) || (asd? new Date(asOf.getFullYear(),0,1) : null);
+  const ptoUsed = +emp.ptoUsed||0;
+
+  // anniversary increment that occurs THIS calendar year, and whether it has happened yet
+  const annivThisCalYear = (asd && calYearStart) ? new Date(calYearStart.getFullYear(), asd.getMonth(), asd.getDate()) : null;
+  const annivThisYearReal = !!(annivThisCalYear && annivThisCalYear>asd);
+  const annivPassed = !!(annivThisYearReal && annivThisCalYear<=asOf);
+  const incThisCalYear = annivThisYearReal && eligible ? ptoGrantDays(ptoWholeYears(asd, annivThisCalYear), tiers)*hpd : 0;
+  const capNow = capHours;  // cap at current tenure
+  const bankNow = annivPassed ? (capNow==null? bankStart+incThisCalYear : Math.min(bankStart+incThisCalYear, capNow)) : bankStart;
+  const ptoAvailable = Math.max(0, bankNow - ptoUsed);
+
+  // ── projection: balance that ROLLS OVER into next year (year-end), then the Jan 1 frontload ──
+  const yearEndAfterAnniv = (capNow==null) ? bankStart+incThisCalYear : Math.min(bankStart+incThisCalYear, capNow); // includes this year's increment (applied by Dec 31)
+  const rolloverHours = Math.max(0, yearEndAfterAnniv - ptoUsed);
+  const nextJan1 = calYearStart ? new Date(calYearStart.getFullYear()+1,0,1) : null;
+  const tenureNextJan1 = (asd && nextJan1) ? ptoWholeYears(asd, nextJan1) : yearsWhole;
+  const lumpNextDays = eligible ? ptoTierFor(tenureNextJan1, tiers).days : 0;
+  const lumpNextHours = lumpNextDays*hpd;
+  const capNextJan1 = ptoCapHoursAt(asd, nextJan1||asOf, hpd, tiers);
+  const nextJan1Balance = (capNextJan1==null) ? rolloverHours+lumpNextHours : Math.min(rolloverHours+lumpNextHours, capNextJan1);
+  const addedAtJan1 = Math.max(0, nextJan1Balance - rolloverHours);
+  const forfeitAtJan1 = Math.max(0, (rolloverHours+lumpNextHours) - nextJan1Balance);
+
+  // ── next anniversary increment (the tier step-up) ──
+  const nextYears = yearsWhole+1;
+  const nextTier = ptoTierFor(nextYears, tiers);
+  const nextGrant = eligible ? ptoGrantDays(nextYears, tiers)*hpd : 0;
+  const nextGrantDays = eligible ? ptoGrantDays(nextYears, tiers) : 0;
+
+  // ── sick (frontloaded 40, usable from 90-day, resets each benefit year) ──
+  const sickFront = ptoSickHrs();
+  const sickUsed = +emp.sickUsed||0;
+  const sickAvailable = ptoUsable ? Math.max(0, sickFront - sickUsed) : 0;   // not usable until 90-day
+  const sickYearStartISO = emp.sickYearStart || ptoSickYearStartISO(asd, asOf);
+  const sickResetDate = (ptoSickBasis()==='calendar')
+    ? new Date(asOf.getFullYear(),11,31)
+    : ptoAddDays(ptoAddYears(ptoParse(sickYearStartISO)||asOf,1),-1);
+
+  // upcoming events within 45 days
+  let soonAnniv=null, soonDays=null;
+  if(eligible && nextAnniv && nextAnniv>asOf){ const dd=ptoDays(asOf,nextAnniv); if(dd<=45){ soonAnniv=nextAnniv; soonDays=dd; } }
+  let soonJan1=null, soonJan1Days=null;
+  if(nextJan1 && nextJan1>asOf){ const dd=ptoDays(asOf,nextJan1); if(dd<=45){ soonJan1=nextJan1; soonJan1Days=dd; } }
+  // recently auto-applied (last 30 days)
+  let recentApplied=null;
+  if(emp.lastApplied && emp.lastApplied.dateISO){ const d=ptoParse(emp.lastApplied.dateISO); if(d && asOf>=d && ptoDays(d,asOf)<=30) recentApplied=emp.lastApplied; }
+  // 90-day just reached (within 30 days)
+  let ninetyRecent=false;
+  if(!ninetySatisfied && ninetyDate && asOf>=ninetyDate && ptoDays(ninetyDate,asOf)<=30) ninetyRecent=true;
+
+  return {asOf, hire, asd, yearsWhole, monthsDisp, tier, hpd, grantHours, thisYearGrant, capHours,
+    lastAnniv, nextAnniv, ninetyDate, ninetySatisfied, ptoUsable, startForNinety, gapDays, priorDays,
+    bankStart, calYearStart, ptoUsed, ptoAvailable, rolloverHours, annivPassed, incThisCalYear,
+    nextYears, nextTier, nextGrant, nextGrantDays,
+    nextJan1, tenureNextJan1, lumpNextDays, lumpNextHours, nextJan1Balance, addedAtJan1, forfeitAtJan1,
+    sickFront, sickUsed, sickAvailable, sickYearStartISO, sickResetDate,
+    eligible, warnings, soonAnniv, soonDays, soonJan1, soonJan1Days, recentApplied, ninetyRecent, leadership:!!emp.leadership};
+}
+function ptoH(h){ if(h==null) return '—'; const r=Math.round(h*10)/10; return (Number.isInteger(r)?r:r.toFixed(1))+'h'; }
+function ptoHd(h){ const hpd=ptoHPD(); const d=h/hpd; const r=Math.round(d*10)/10; return (Number.isInteger(r)?r:r.toFixed(1))+'d'; }
+
+// --- Hours-detail: Accruals tab (tenure-based PTO / Sick per policy §7.5) ---
 function accrualsTab(empId, start, stop){
   const e=emp(empId);
-  const pAll=e.pto?.allot||0, pUse=e.pto?.used||0, sAll=e.sick?.allot||0, sUse=e.sick?.used||0;
   const com=committedLeave(empId);
-  const row=(name,icon,all,used,committed,kind)=>{
-    const avail=all-used-committed;
+  const pUse=e.pto?.used||0, sUse=e.sick?.used||0;
+  const pCom=com.PTO+com.Bereavement, sCom=com.Sick;
+  const row=(name,icon,all,used,committed,avail,kind)=>{
     const usedCell = used>0
       ? `<td class="num accr-link" onclick="showAccrual('${empId}','${kind}','used')" title="View dates used">${h2(used)}</td>`
       : `<td class="num">${h2(used)}</td>`;
@@ -2524,19 +2771,54 @@ function accrualsTab(empId, start, stop){
       : `<td class="num">—</td>`;
     return `<tr>
       <td><i class="ti ${icon}" style="color:var(--muted)"></i> <b>${name}</b></td>
-      <td class="num">${h2(all)}</td>
+      <td class="num">${all==null?'—':h2(all)}</td>
       ${usedCell}
       ${comCell}
       <td class="num"><b style="color:${avail<0?'var(--bad)':'var(--navy)'}">${h2s(avail)}</b></td></tr>`;
   };
-  const empty=(pAll+pUse+sAll+sUse)===0;
+
+  // ── no hire date → can't compute tenure; fall back to any synced allotments ──
+  if(!e.hireDate){
+    const pAll=e.pto?.allot||0, sAll=e.sick?.allot||0;
+    return `<div class="card">
+      <div class="reqbanner act"><div class="reqrow"><i class="ti ti-alert-triangle"></i>
+        <div><b>No hire date on file</b><div class="reqmeta">PTO &amp; sick are calculated from tenure. Add this employee's hire date to their record and balances will compute automatically.</div></div>
+        ${me().role==='hr'?`<button class="btn primary sm" onclick="openAccrEdit('${empId}')"><i class="ti ti-calendar-plus"></i> Add hire date</button>`:''}</div></div>
+      <table class="wtable"><thead><tr><th>Type</th><th class="num">Allotted</th><th class="num">Used YTD</th><th class="num">Committed</th><th class="num">Available</th></tr></thead>
+      <tbody>
+        ${row('PTO','ti-beach',pAll,pUse,pCom,pAll-pUse-pCom,'pto')}
+        ${row('Sick','ti-first-aid-kit',sAll,sUse,sCom,sAll-sUse-sCom,'sick')}
+      </tbody></table>
+      <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> Click a <b>Used YTD</b> or <b>Committed</b> value to see the dates. Times shown as h:mm.</div>
+    </div>`;
+  }
+
+  // ── tenure mode ──
+  const c = ptoCompute({ hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
+    leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed:pUse, sickUsed:sUse }, todayYmd(e));
+
+  const ptoAll = c.eligible ? c.grantHours : null;                 // this year's PTO entitlement (by tier)
+  const ptoAvail = c.eligible ? Math.max(0, c.ptoAvailable - pCom) : 0;
+  const sickAvail = Math.max(0, c.sickAvailable - sCom);           // sickAvailable already 90-day gated
+
+  const tenureStr = c.yearsWhole>0 ? `${c.yearsWhole} yr${c.yearsWhole===1?'':'s'}${c.monthsDisp?` ${c.monthsDisp} mo`:''}` : `${c.monthsDisp} mo`;
+  const typeLabel = !c.eligible ? 'Part-time · not PTO-eligible' : (c.leadership ? 'Leadership / salaried' : 'Hourly');
+  const ninety = c.ptoUsable ? 'past 90-day mark' : `usable after 90 days (${ptoFmt(c.ninetyDate)})`;
+  const capStr = (c.capHours==null) ? 'no cap' : `cap ${h2(c.capHours)}`;
+  const nextIncTxt = c.nextGrant>0 ? `+${h2(c.nextGrant)}` : 'no increase';
+
   return `<div class="card">
+    <div class="reqbanner info"><div class="reqrow"><i class="ti ti-user-heart"></i>
+      <div><b>Tenure-based accrual · ${typeLabel}</b>
+      <div class="reqmeta">Service date <b>${ptoFmt(c.asd)}</b>${e.rehire?' <span class="src">bridged</span>':''} · <b>${tenureStr}</b> of service · PTO ${ninety} · ${capStr}${c.warnings.length?` · <span style="color:var(--warn)">${c.warnings[0]}</span>`:''}</div></div>
+      ${me().role==='hr'?`<button class="btn ghost sm" onclick="openAccrEdit('${empId}')"><i class="ti ti-pencil"></i> Edit</button>`:''}</div></div>
     <table class="wtable"><thead><tr><th>Type</th><th class="num">Allotted</th><th class="num">Used YTD</th><th class="num">Committed</th><th class="num">Available</th></tr></thead>
     <tbody>
-      ${row('PTO','ti-beach',pAll,pUse,com.PTO+com.Bereavement,'pto')}
-      ${row('Sick','ti-first-aid-kit',sAll,sUse,com.Sick,'sick')}
+      ${row('PTO','ti-beach',ptoAll,pUse,pCom,ptoAvail,'pto')}
+      ${row('Sick','ti-first-aid-kit',c.sickFront,sUse,sCom,sickAvail,'sick')}
     </tbody></table>
-    <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> ${empty?'No balances synced yet for this employee — ':''}Allotted &amp; Used YTD sync from the HR Hub PTO tracker. <b>Committed</b> = approved leave dated in the future; Available already subtracts it, so PTO booked months ahead is reflected today. Click a <b>Used YTD</b> or <b>Committed</b> value to see the dates. Times shown as h:mm.</div>
+    <div class="hint" style="margin-top:10px"><i class="ti ti-calendar-event"></i> Next anniversary <b>${c.nextAnniv?ptoFmt(c.nextAnniv):'—'}</b> (${nextIncTxt}) · projected PTO on Jan 1 <b>${h2(c.nextJan1Balance)}</b>${c.forfeitAtJan1>0?` · ~${h2(c.forfeitAtJan1)} would exceed the cap`:''}.</div>
+    <div class="hint" style="margin-top:6px"><i class="ti ti-info-circle"></i> Allotted &amp; Available compute from tenure per the 2026 PTO policy (§7.5) — ${c.leadership?'leadership':'hourly'} chart, 8h = 1 day, sick frontloaded ${h2(c.sickFront)} and resets Dec 31. <b>Committed</b> = approved future leave, already subtracted from Available. Click a <b>Used YTD</b> or <b>Committed</b> value for the dates. Times shown as h:mm.</div>
   </div>`;
 }
 
@@ -2587,6 +2869,54 @@ function renderAccrualModal(){
       </table>${recon}
     </div>
     <div class="modalfoot"><button class="btn primary" onclick="closeAccrual()">Close</button></div></div>`;
+  host.classList.add('show');
+}
+
+// --- Accrual profile editor: hire date & tenure inputs that drive the accrual engine ---
+let ACCRED=null;
+function openAccrEdit(empId){
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;ACCR=null;
+  const e=emp(empId);
+  ACCRED={ empId, hireDate:e.hireDate||'', leadership:!!e.leadership, ptoEligible:e.ptoEligible!==false,
+           rehire:!!e.rehire, priorSepDate:e.priorSepDate||'', rehireDate:e.rehireDate||'' };
+  render();
+}
+function closeAccrEdit(){ ACCRED=null; render(); }
+function accrEdSet(k,v){ ACCRED[k]=v; renderAccrEditModal(); }
+function saveAccrEdit(){
+  const d=ACCRED; if(!d.hireDate){ toast('Hire date is required'); return; }
+  const e=emp(d.empId);
+  const patch={ hireDate:d.hireDate, leadership:!!d.leadership, ptoEligible:!!d.ptoEligible,
+    rehire:!!d.rehire, priorSepDate:d.rehire?(d.priorSepDate||null):null, rehireDate:d.rehire?(d.rehireDate||null):null };
+  Object.assign(e, patch);
+  chk(Store.updateEmployee(e.id, patch),'Employee');
+  ACCRED=null; toast('Accrual profile saved'); render();
+}
+function renderAccrEditModal(){
+  const host=document.getElementById('modal'); if(!ACCRED){ host.innerHTML=''; host.classList.remove('show'); return; }
+  const d=ACCRED; const e=emp(d.empId);
+  host.innerHTML=`<div class="modalcard"><div class="modalhead">
+      <div><b>Accrual profile</b><div class="hint">${e.name} · ID ${e.empId}</div></div>
+      <button class="btn ghost sm" onclick="closeAccrEdit()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="hint" style="margin-bottom:12px">PTO &amp; sick are calculated from tenure. Set the hire date and type below; balances update automatically.</div>
+      <div class="field"><label>Hire date</label><input type="date" value="${d.hireDate}" onchange="accrEdSet('hireDate',this.value)"></div>
+      <div class="field" style="margin-top:12px"><label>Employee type</label>
+        <select onchange="accrEdSet('leadership',this.value==='lead')">
+          <option value="hourly" ${!d.leadership?'selected':''}>Hourly (standard chart)</option>
+          <option value="lead" ${d.leadership?'selected':''}>Leadership / salaried chart</option>
+        </select></div>
+      <label class="wk-toggle" style="margin-top:14px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" ${d.ptoEligible?'checked':''} onchange="accrEdSet('ptoEligible',this.checked)"> PTO-eligible (avg 30+ hrs/week — uncheck for part-time)</label>
+      <label class="wk-toggle" style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" ${d.rehire?'checked':''} onchange="accrEdSet('rehire',this.checked)"> Rehire — bridge prior service for tenure</label>
+      ${d.rehire?`<div style="display:flex;gap:12px;margin-top:12px">
+        <div class="field" style="flex:1"><label>Prior separation date</label><input type="date" value="${d.priorSepDate}" onchange="accrEdSet('priorSepDate',this.value)"></div>
+        <div class="field" style="flex:1"><label>Rehire (current start) date</label><input type="date" value="${d.rehireDate}" onchange="accrEdSet('rehireDate',this.value)"></div>
+      </div><div class="hint" style="margin-top:6px">Hire date above = <b>original</b> hire; tenure counts prior service up to the separation, then resumes at rehire.</div>`:''}
+    </div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closeAccrEdit()">Cancel</button>
+      <button class="btn primary" onclick="saveAccrEdit()"><i class="ti ti-check"></i> Save</button></div></div>`;
   host.classList.add('show');
 }
 

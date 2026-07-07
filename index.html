@@ -238,6 +238,26 @@ tr:last-child td{border-bottom:none}
 .reqrow>div:nth-child(2){flex:1}
 .reqrow b{font-size:13px} .reqmeta{font-size:11.5px;color:var(--muted);margin-top:2px}
 
+/* Progressive-discipline ladder (Occurrences tab reference chart) */
+.displadder{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--card)}
+.displadder-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.displadder-eyebrow{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600}
+.displadder-action{font-size:16px;font-weight:700;margin-top:3px;display:flex;align-items:center;gap:7px}
+.displadder-action.ok{color:var(--ok)} .displadder-action.warn{color:var(--warn)} .displadder-action.bad{color:var(--bad)}
+.ladder{display:flex;gap:6px}
+.lstep{flex:1;border:1.5px solid var(--line);border-radius:9px;padding:9px 8px;background:#fbfcfe;opacity:.55;transition:.15s;min-width:0;position:relative}
+.lstep.on{opacity:1;box-shadow:0 3px 10px rgba(15,30,61,.09)}
+.lstep.on.ok{border-color:var(--ok);background:var(--okbg)}
+.lstep.on.warn{border-color:var(--warn);background:var(--warnbg)}
+.lstep.on.bad{border-color:var(--bad);background:var(--badbg)}
+.lstep-band{font-size:12px;font-weight:700}
+.lstep.on.ok .lstep-band{color:var(--ok)} .lstep.on.warn .lstep-band{color:var(--warn)} .lstep.on.bad .lstep-band{color:var(--bad)}
+.lstep-lbl{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
+.lstep.on .lstep-lbl{color:var(--ink)}
+@media(max-width:640px){.ladder{flex-wrap:wrap}.lstep{flex:1 1 45%}}
+.accr-link{cursor:pointer;color:var(--accent);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+.accr-link:hover{background:#eef2ff}
+
 /* Widget board (Namely-style) */
 .wboard{columns:3;column-gap:18px}
 @media(max-width:1050px){.wboard{columns:2}}
@@ -733,14 +753,18 @@ const CFG = {
   dedupMin:3,               // punches of same type within N min are de-duplicated (latest source wins)
   trackingStart:''          // company go-live floor (YYYY-MM-DD); blank = start counting from each employee's first punch
 };
+// WS Display attendance policy — progressive, by rolling 12-mo point total.
+// Single source of truth for the tier chart shown to managers in the Occurrences tab.
+const DISCIPLINE_BANDS=[
+  {min:0,  max:0,        band:'0',     label:'Good standing',                              action:'No action needed',                          tone:'ok'},
+  {min:1,  max:5,        band:'1–5',   label:'Coaching / informal',                        action:'Informal coaching conversation',            tone:'warn'},
+  {min:6,  max:10,       band:'6–10',  label:'Verbal warning',                             action:'Documented verbal warning',                 tone:'warn'},
+  {min:11, max:15,       band:'11–15', label:'Written warning',                            action:'Formal written warning',                    tone:'bad'},
+  {min:16, max:Infinity, band:'16+',   label:'Final warning / suspension / termination',   action:'Final warning, suspension, or termination', tone:'bad'}
+];
 function disciplineTier(pts){
-  // WS Display attendance policy — progressive, by total accumulated (rolling 12-mo) points.
-  // Coaching 1–5 · Verbal 6–10 · Written 11–15 · Final 16+
-  if(pts>=16) return {label:'Final warning / suspension / termination', tone:'bad',  band:'16+'};
-  if(pts>=11) return {label:'Written warning',                          tone:'bad',  band:'11–15'};
-  if(pts>=6)  return {label:'Verbal warning',                           tone:'warn', band:'6–10'};
-  if(pts>=1)  return {label:'Coaching / informal',                      tone:'warn', band:'1–5'};
-  return {label:'Good standing', tone:'ok', band:'0'};
+  for(let i=DISCIPLINE_BANDS.length-1;i>=0;i--){ if(pts>=DISCIPLINE_BANDS[i].min) return DISCIPLINE_BANDS[i]; }
+  return DISCIPLINE_BANDS[0];
 }
 const JOBCODES=['CA - REG','PA - REG','Training','Meeting'];
 
@@ -1263,6 +1287,7 @@ function render(){
   else if(LNOTE) renderLeaveNoteModal();
   else if(PUNCH) renderPunchModal();
   else if(PAYVIEW) renderPayModal();
+  else if(ACCR) renderAccrualModal();
   else { host.innerHTML=''; host.classList.remove('show'); }
 }
 
@@ -2070,11 +2095,11 @@ function empListPanel(cfg){
       <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
     </div><div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div></div>`;
 }
-function hoursSelect(id){ HOURS.empId=id; HOURS.listOpen=false; render(); }
+function hoursSelect(id){ ACCR=null; HOURS.empId=id; HOURS.listOpen=false; render(); }
 function toggleHoursList(){ HOURS.listOpen=!HOURS.listOpen; render(); }
 function hoursSort(v){ HOURS.sort=v; render(); }
 function hoursSearch(v){ HOURS.search=v; render(); }
-function hoursTab(v){ HOURS.tab=v; render(); }
+function hoursTab(v){ ACCR=null; HOURS.tab=v; render(); }
 function hoursSchedWeekends(){ HOURS.schedWeekends=!HOURS.schedWeekends; render(); }
 function hoursPreset(v){
   HOURS.preset=v; const e=emp(HOURS.empId)||me(); const t=todayYmd(e); const sun=sundayOf(t);
@@ -2087,6 +2112,7 @@ function hoursPreset(v){
 }
 function hoursDate(field,v){ HOURS[field]=v; HOURS.preset='custom'; render(); }
 function hoursNav(dir){
+  ACCR=null;
   const list=sortedEmployees(); const i=list.findIndex(e=>e.id===HOURS.empId);
   const ni=Math.min(list.length-1, Math.max(0, (i<0?0:i)+dir));
   if(list[ni]){ HOURS.empId=list[ni].id; render(); }
@@ -2439,6 +2465,26 @@ function collSection(key, icon, title, summary, bodyFn){
     ${open?`<div class="sec-body">${bodyFn()}</div>`:''}
   </div>`;
 }
+// Progressive-discipline reference chart shown to managers. Highlights the band the
+// employee's rolling points fall into and states the recommended corrective action.
+function disciplineLadder(roll){
+  const cur=disciplineTier(roll);
+  const steps=DISCIPLINE_BANDS.map(b=>{
+    const on=b===cur;
+    return `<div class="lstep ${on?'on '+b.tone:''}">
+      <div class="lstep-band">${b.band} pts</div>
+      <div class="lstep-lbl">${b.action}</div></div>`;
+  }).join('');
+  return `<div class="displadder">
+    <div class="displadder-head">
+      <div><div class="displadder-eyebrow">Recommended corrective action</div>
+        <div class="displadder-action ${cur.tone}"><i class="ti ti-gavel"></i> ${cur.action}</div></div>
+    </div>
+    <div class="ladder">${steps}</div>
+    <div class="hint" style="margin-top:9px"><i class="ti ti-info-circle"></i> Based on WS Display's attendance policy. Standing follows the rolling 12-month point total; recommendations are guidance — final action stays at HR/manager discretion.</div>
+  </div>`;
+}
+
 // --- Hours-detail: Occurrences tab ---
 function occSection(empId, start, stop){
   const occ=periodOccurrences(empId,start,stop).sort((a,b)=>a.date.localeCompare(b.date));
@@ -2449,6 +2495,7 @@ function occSection(empId, start, stop){
       <div><b>Standing: ${tier.label} <span class="pill ${tier.tone}">${tier.band} pts</span></b>
       <div class="reqmeta"><b>${periodPts}</b> pts this period · <b>${roll}</b> pts rolling 12 months (drives standing). Absences count only in weeks the employee clocked in; days with approved leave are waived.</div></div>
       <button class="btn ghost sm" onclick="openOcc('${empId}')"><i class="ti ti-plus"></i> Record occurrence</button></div></div>
+    ${disciplineLadder(roll)}
     ${occ.length? `<table class="wtable" style="margin-top:12px"><thead><tr><th>Date</th><th>Occurrence</th><th class="num">Pts</th><th></th></tr></thead><tbody>
       ${occ.map(o=>{const dt=ymdD(o.date);const dl=dt.toLocaleDateString('en-US',{month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
         return `<tr class="${o.excused?'occ-excused':''}"><td>${dl}</td>
@@ -2467,24 +2514,80 @@ function accrualsTab(empId, start, stop){
   const e=emp(empId);
   const pAll=e.pto?.allot||0, pUse=e.pto?.used||0, sAll=e.sick?.allot||0, sUse=e.sick?.used||0;
   const com=committedLeave(empId);
-  const row=(name,icon,all,used,committed)=>{
+  const row=(name,icon,all,used,committed,kind)=>{
     const avail=all-used-committed;
+    const usedCell = used>0
+      ? `<td class="num accr-link" onclick="showAccrual('${empId}','${kind}','used')" title="View dates used">${h2(used)}</td>`
+      : `<td class="num">${h2(used)}</td>`;
+    const comCell = committed>0
+      ? `<td class="num accr-link" onclick="showAccrual('${empId}','${kind}','committed')" title="View committed dates">${h2(committed)}</td>`
+      : `<td class="num">—</td>`;
     return `<tr>
       <td><i class="ti ${icon}" style="color:var(--muted)"></i> <b>${name}</b></td>
       <td class="num">${h2(all)}</td>
-      <td class="num">${h2(used)}</td>
-      <td class="num">${committed?h2(committed):'—'}</td>
+      ${usedCell}
+      ${comCell}
       <td class="num"><b style="color:${avail<0?'var(--bad)':'var(--navy)'}">${h2s(avail)}</b></td></tr>`;
   };
   const empty=(pAll+pUse+sAll+sUse)===0;
   return `<div class="card">
     <table class="wtable"><thead><tr><th>Type</th><th class="num">Allotted</th><th class="num">Used YTD</th><th class="num">Committed</th><th class="num">Available</th></tr></thead>
     <tbody>
-      ${row('PTO','ti-beach',pAll,pUse,com.PTO+com.Bereavement)}
-      ${row('Sick','ti-first-aid-kit',sAll,sUse,com.Sick)}
+      ${row('PTO','ti-beach',pAll,pUse,com.PTO+com.Bereavement,'pto')}
+      ${row('Sick','ti-first-aid-kit',sAll,sUse,com.Sick,'sick')}
     </tbody></table>
-    <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> ${empty?'No balances synced yet for this employee — ':''}Allotted &amp; Used YTD sync from the HR Hub PTO tracker. <b>Committed</b> = approved leave dated in the future; Available already subtracts it, so PTO booked months ahead is reflected today. Times shown as h:mm.</div>
+    <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> ${empty?'No balances synced yet for this employee — ':''}Allotted &amp; Used YTD sync from the HR Hub PTO tracker. <b>Committed</b> = approved leave dated in the future; Available already subtracts it, so PTO booked months ahead is reflected today. Click a <b>Used YTD</b> or <b>Committed</b> value to see the dates. Times shown as h:mm.</div>
   </div>`;
+}
+
+// --- Accrual detail popup: dates behind a Used YTD or Committed value ---
+let ACCR=null;
+function showAccrual(empId,kind,col){
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;
+  ACCR={empId,kind,col}; render();
+}
+function closeAccrual(){ ACCR=null; render(); }
+function renderAccrualModal(){
+  const host=document.getElementById('modal'); if(!ACCR){ host.innerHTML=''; host.classList.remove('show'); return; }
+  const {empId,kind,col}=ACCR; const e=emp(empId);
+  const types = kind==='pto' ? ['PTO','Bereavement'] : ['Sick'];
+  const label = kind==='pto' ? 'PTO' : 'Sick';
+  const today=todayYmd(e); const yearStart=today.slice(0,4)+'-01-01';
+  let entries, title, sub, syncedTotal=null;
+  if(col==='committed'){
+    entries = DB.leave.filter(l=>l.emp===empId && types.includes(l.type) && l.date>today);
+    title = `${label} — Committed (upcoming)`;
+    sub = 'Approved leave dated in the future. These hours are already subtracted from Available.';
+  } else {
+    entries = DB.leave.filter(l=>l.emp===empId && types.includes(l.type) && l.date>=yearStart && l.date<=today);
+    title = `${label} — Used year-to-date`;
+    sub = 'Leave recorded in the timekeeping portal so far this year.';
+    syncedTotal = kind==='pto' ? (e.pto?.used||0) : (e.sick?.used||0);
+  }
+  entries=entries.sort((a,b)=>a.date.localeCompare(b.date));
+  const localSum=Math.round(entries.reduce((s,l)=>s+l.hours,0)*100)/100;
+  const rows = entries.length ? entries.map(l=>{
+    const dt=ymdD(l.date).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
+    return `<tr><td>${dt} <span class="ltag ${l.type.toLowerCase()}" style="cursor:default">${l.type}</span></td>
+      <td class="num"><b>${h2(l.hours)}</b></td><td class="hint">${l.note||''}</td></tr>`;
+  }).join('') : `<tr><td colspan="3" class="hint" style="padding:16px;text-align:center">No dated entries recorded in the timekeeping portal.</td></tr>`;
+  let recon='';
+  if(col==='used'){
+    const diff=Math.round((syncedTotal-localSum)*100)/100;
+    if(Math.abs(diff)>0.001) recon=`<div class="hint" style="margin-top:10px"><i class="ti ti-info-circle"></i> HR Hub reports <b>${h2(syncedTotal)}</b> used YTD; <b>${h2(localSum)}</b> is dated in the timekeeping portal above. The remaining <b>${h2(Math.abs(diff))}</b> is tracked in the HR Hub PTO tracker.</div>`;
+  }
+  host.innerHTML=`<div class="modalcard"><div class="modalhead">
+      <div><b>${title}</b><div class="hint">${e.name} · ID ${e.empId}</div></div>
+      <button class="btn ghost sm" onclick="closeAccrual()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="hint" style="margin-bottom:12px">${sub}</div>
+      <table class="wtable"><thead><tr><th>Date</th><th class="num">Hours</th><th>Note</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td style="text-align:right"><b>Total</b></td><td class="num"><b>${h2(localSum)}</b></td><td></td></tr></tfoot>
+      </table>${recon}
+    </div>
+    <div class="modalfoot"><button class="btn primary" onclick="closeAccrual()">Close</button></div></div>`;
+  host.classList.add('show');
 }
 
 // --- Hours-detail: this employee's effective schedule for the period ---
@@ -2690,19 +2793,15 @@ function viewHours(){
       </div>
       <div class="detail-who"><b>${e.name}</b><span>ID ${e.empId} · ${e.dept} · ${e.loc} · ${TZ[e.tz]}</span></div>
       <div style="flex:1"></div>
-      <details class="dl-menu">
+      ${tab==='occ'?`<details class="dl-menu">
         <summary class="btn ghost sm"><i class="ti ti-download"></i> Download</summary>
         <div class="dl-pop">
-          ${tab==='occ'
-            ? `<div class="dl-lbl">Occurrences</div>
-               <button onclick="downloadOccPDF();this.closest('details').removeAttribute('open')">PDF</button>
-               <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>`
-            : `<div class="dl-lbl">Hours — this period</div>
-               <button onclick="downloadHoursPDF();this.closest('details').removeAttribute('open')">PDF</button>
-               <button onclick="downloadHoursCSV();this.closest('details').removeAttribute('open')">CSV</button>`}
+          <div class="dl-lbl">Occurrences</div>
+          <button onclick="downloadOccPDF();this.closest('details').removeAttribute('open')">PDF</button>
+          <button onclick="downloadOccCSV();this.closest('details').removeAttribute('open')">CSV</button>
         </div>
-      </details>
-      ${me().role==='hr'?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve &amp; send to Payroll</button>`:''}
+      </details>`:''}
+      ${(tab==='hours'&&me().role==='hr')?`<button class="btn primary" onclick="approveSendPayroll()"><i class="ti ti-cash"></i> Approve &amp; send to Payroll</button>`:''}
     </div>
     ${me().role==='hr'?(()=>{const b=batchForPeriod(HOURS.start,HOURS.stop); if(b&&b.status==='sent') return `<div class="reqbanner info"><div class="reqrow"><i class="ti ti-cash"></i><div><b>Period sent to Payroll</b><div class="reqmeta">${new Date(b.at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})} by ${b.by}${b.version>1?` · v${b.version}`:''} — timecards are locked.</div></div><button class="btn ghost sm" onclick="reopenPeriod('${HOURS.start}','${HOURS.stop}')"><i class="ti ti-lock-open"></i> Reopen</button></div></div>`; return '';})():''}
     ${body}`;

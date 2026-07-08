@@ -778,6 +778,9 @@ const Store = (() => {
     saveLocation(l){ return enabled ? sb.from('punch_locations').upsert({id:l.id,name:l.name,state:l.state||null,lat:l.lat,lng:l.lng,radius_m:l.radius,active:l.active,updated_at:new Date().toISOString()}) : null; },
     removeLocation(id){ return enabled ? sb.from('punch_locations').delete().eq('id',id) : null; },
     async signedPhoto(path){ if(!enabled||!path) return null; const { data, error } = await sb.storage.from('punch-photos').createSignedUrl(path, 120); return error?null:data.signedUrl; },
+    async resetPin(empId, pin){ if(!enabled) return {ok:false,error:'offline'};
+      const { data, error } = await sb.rpc('reset_pin', { p_emp_id:String(empId), p_pin:String(pin) });
+      if(error) return {ok:false, error:error.message}; return data||{ok:false}; },
     subscribe(tables,onChange,onStatus){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); ch.subscribe(onStatus); return ch; },
     removeChannel(ch){ if(enabled && ch) sb.removeChannel(ch); },
   };
@@ -1559,6 +1562,7 @@ function render(){
   else if(PEDIT) renderPremiumModal();
   else if(HEDIT) renderHolidayModal();
   else if(LOCEDIT) renderLocModal();
+  else if(PINSET) renderPinModal();
   else if(NEDIT) renderNoteModal();
   else if(LNOTE) renderLeaveNoteModal();
   else if(PUNCH) renderPunchModal();
@@ -3212,7 +3216,7 @@ function accrualsTab(empId, start, stop){
 // --- Accrual detail popup: dates behind a Used YTD or Committed value ---
 let ACCR=null;
 function showAccrual(empId,kind,col){
-  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;TODETAIL=null;LOCEDIT=null;
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;TODETAIL=null;LOCEDIT=null;PINSET=null;
   ACCR={empId,kind,col}; render();
 }
 function closeAccrual(){ ACCR=null; render(); }
@@ -3262,7 +3266,7 @@ function renderAccrualModal(){
 // --- Accrual profile editor: hire date & tenure inputs that drive the accrual engine ---
 let ACCRED=null;
 function openAccrEdit(empId){
-  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;ACCR=null;TODETAIL=null;LOCEDIT=null;
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;ACCR=null;TODETAIL=null;LOCEDIT=null;PINSET=null;
   const e=emp(empId);
   ACCRED={ empId, hireDate:e.hireDate||'', leadership:!!e.leadership, ptoEligible:e.ptoEligible!==false,
            rehire:!!e.rehire, priorSepDate:e.priorSepDate||'', rehireDate:e.rehireDate||'' };
@@ -4082,8 +4086,7 @@ function geoDistM(lat1,lng1,lat2,lng2){
 function withinAnySite(lat,lng){
   return (DB.punchLocations||[]).some(s=>s.active && s.lat!=null && s.lng!=null && geoDistM(lat,lng,s.lat,s.lng)<=(s.radius||200));
 }
-let LOCEDIT=null;
-function openLoc(id){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;TODETAIL=null;LOCEDIT=null;
+let LOCEDIT=null;function openLoc(id){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;TODETAIL=null;LOCEDIT=null;PINSET=null;
   const l=id?DB.punchLocations.find(x=>x.id===id):null;
   LOCEDIT=l?{...l}:{id:null, name:'', state:'', lat:null, lng:null, radius:200, active:true, capturing:false}; render(); }
 function locSet(f,v){ LOCEDIT[f]=(f==='radius')?Math.max(10,+v||0):(f==='lat'||f==='lng')?(v===''?null:+v):v; }
@@ -4128,6 +4131,35 @@ function renderLocModal(){
     </div>
     <div class="modalfoot">${l.id?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deleteLoc('${l.id}');closeLoc()"><i class="ti ti-trash"></i> Remove</button>`:''}
       <button class="btn ghost" onclick="closeLoc()">Cancel</button><button class="btn primary" onclick="saveLoc()">Save</button></div></div>`;
+  host.classList.add('show');
+}
+
+/* ---------- HR: set / reset an employee's web-clock PIN ---------- */
+let PINSET=null;
+function openPinSet(empId){ EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;TODETAIL=null;LOCEDIT=null;PINSET=null;
+  const e=emp(empId); if(!e) return; PINSET={id:e.id, empNum:e.empId, name:e.name, pin:'', pin2:'', busy:false, err:''}; render(); }
+function closePinSet(){ PINSET=null; render(); }
+function pinSetField(f,v){ if(PINSET) PINSET[f]=(v||'').replace(/\D/g,'').slice(0,4); }
+async function savePinSet(){ const P=PINSET; if(!P) return;
+  if(!/^\d{4}$/.test(P.pin)){ P.err='PIN must be exactly 4 digits'; return render(); }
+  if(P.pin!==P.pin2){ P.err='PINs don\u2019t match'; return render(); }
+  if(!P.empNum){ P.err='This person has no employee ID number yet — set one first'; return render(); }
+  P.busy=true; P.err=''; render();
+  const res=await Store.resetPin(P.empNum, P.pin); P.busy=false;
+  if(!res || res.ok===false){ P.err=(res&&res.error)||'Could not set PIN'; return render(); }
+  toast('PIN set for '+P.name.split(' ')[0]); PINSET=null; render();
+}
+function renderPinModal(){ const host=document.getElementById('modal'); const P=PINSET;
+  const box=(f)=>`<input inputmode="numeric" maxlength="4" type="password" value="${P[f]}" oninput="pinSetField('${f}',this.value);this.value=PINSET.${f}" style="letter-spacing:10px;font-size:22px;width:130px;text-align:center;padding:11px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe">`;
+  host.innerHTML=`<div class="modalcard" style="max-width:430px"><div class="modalhead"><div><b>Set web-clock PIN</b><div class="hint">${esc(P.name)} · ID ${esc(P.empNum||'—')}</div></div>
+    <button class="btn ghost sm" onclick="closePinSet()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      <div class="field"><label>New 4-digit PIN</label><div>${box('pin')}</div></div>
+      <div class="field" style="margin-top:12px"><label>Confirm PIN</label><div>${box('pin2')}</div></div>
+      ${P.err?`<div class="hint" style="color:var(--bad);margin-top:10px"><i class="ti ti-alert-circle"></i> ${esc(P.err)}</div>`:''}
+      <div class="notewarn" style="margin-top:14px"><i class="ti ti-info-circle"></i> This sets or overwrites this person's clock PIN right away — share it with them privately. Employees can also create their own PIN the first time they sign in to the web clock.</div>
+    </div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closePinSet()">Cancel</button><button class="btn primary" onclick="savePinSet()" ${P.busy?'disabled':''}>${P.busy?'Saving…':'Set PIN'}</button></div></div>`;
   host.classList.add('show');
 }
 function viewConfig(){
@@ -4300,9 +4332,10 @@ function rosterRow(e, managers){
     <td class="num"><input type="number" step="0.25" min="0" value="${(e.rate||0).toFixed(2)}" style="width:78px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:7px" onchange="setField('${e.id}','rate',+this.value)"></td>
     <td><button class="toggle ${e.webPunch?'on':''}" onclick="setField('${e.id}','webPunch',${e.webPunch?'false':'true'})" title="${e.webPunch?'Can clock in/out from the web clock':'Biometric clock only'}"><span></span></button></td>
     <td><button class="toggle ${e.remote!==false?'on':''}" onclick="setField('${e.id}','remote',${e.remote!==false?'false':'true'})" title="${e.remote!==false?'Remote — stays signed in on their own device':'On-site terminal — auto-signs-out after each punch'}"><span></span></button></td>
+    <td><button class="btn sm" title="Set or reset this employee's web-clock PIN" onclick="openPinSet('${e.id}')"><i class="ti ti-key"></i> Set</button></td>
   </tr>`;
 }
-const ROSTER_HEAD = `<thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th><th>Remote</th></tr></thead>`;
+const ROSTER_HEAD = `<thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th><th>Remote</th><th>PIN</th></tr></thead>`;
 // HR / admin row — same columns as the roster, but the Manager cell shows a full-access pill instead of a dropdown
 function hrRow(e){
   return `<tr>
@@ -4320,6 +4353,7 @@ function hrRow(e){
     <td class="num"><input type="number" step="0.25" min="0" value="${(e.rate||0).toFixed(2)}" style="width:78px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:7px" onchange="setField('${e.id}','rate',+this.value)"></td>
     <td><button class="toggle ${e.webPunch?'on':''}" onclick="setField('${e.id}','webPunch',${e.webPunch?'false':'true'})" title="${e.webPunch?'Can clock in/out from the web clock':'Biometric clock only'}"><span></span></button></td>
     <td><button class="toggle ${e.remote!==false?'on':''}" onclick="setField('${e.id}','remote',${e.remote!==false?'false':'true'})" title="${e.remote!==false?'Remote — stays signed in on their own device':'On-site terminal — auto-signs-out after each punch'}"><span></span></button></td>
+    <td><button class="btn sm" title="Set or reset this user's web-clock PIN" onclick="openPinSet('${e.id}')"><i class="ti ti-key"></i> Set</button></td>
   </tr>`;
 }
 

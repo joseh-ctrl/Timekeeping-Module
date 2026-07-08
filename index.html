@@ -213,6 +213,12 @@ tr:last-child td{border-bottom:none}
 .modalbody input[type=date],.modalbody input[type=time],.modalbody select{padding:7px 9px;border:1px solid var(--line);border-radius:7px;background:#fbfcfe;width:100%}
 .modalfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
 .notewarn{margin-top:14px;padding:11px 13px;background:var(--warnbg);color:#92600a;border-radius:9px;font-size:12.5px;display:flex;gap:8px;align-items:flex-start}
+.segrowedit{display:grid;grid-template-columns:auto 150px 1fr 118px;gap:10px;align-items:center;margin-bottom:12px}
+.segrowedit.off{opacity:.5}
+.segrowedit input[type=date],.segrowedit input[type=time],.segrowedit select{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe;font-size:13px}
+.segchk{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;cursor:pointer}
+.segchk input{width:16px;height:16px}
+.seglen{font-size:12px;font-weight:700;color:var(--warn);background:var(--warnbg);padding:6px 11px;border-radius:8px;margin-right:8px;white-space:nowrap}
 .notewarn i{font-size:16px;margin-top:1px}
 
 /* History */
@@ -515,7 +521,11 @@ tr:last-child td{border-bottom:none}
 .tcard tbody tr:nth-child(even) td{background:#f5f7fb}
 .tcard th.num,.tcard td.num{text-align:center}
 .ltag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:6px;cursor:pointer;text-transform:uppercase}
-.ltag.pto{color:#1d4ed8;background:#e7effc} .ltag.sick{color:#b45309;background:#fef3c7} .ltag.holiday{color:#0f766e;background:#ccfbf1} .ltag.bereavement{color:#6d28d9;background:#ede9fe}
+.ltag.pto{color:#1d4ed8;background:#e7effc} .ltag.sick{color:#b45309;background:#fef3c7} .ltag.holiday{color:#0f766e;background:#ccfbf1} .ltag.bereavement{color:#6d28d9;background:#ede9fe} .ltag.regular{color:#3730a3;background:#e0e7ff}
+.photoview{position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:300;display:grid;place-items:center;padding:24px;cursor:zoom-out}
+.photoview-inner{position:relative;max-width:92vw;max-height:88vh;cursor:default}
+.photoview-inner img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);display:block}
+.photoview-x{position:absolute;top:-14px;right:-14px;width:36px;height:36px;border-radius:50%;background:#fff;border:none;font-size:22px;line-height:34px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
 .tcard tr.tc-day td{border-top:1px solid var(--line)}
 .tcard .apcol{text-align:center;width:34px}
 .tcard th.apcol{font-size:13px;font-weight:700;color:var(--navy)}
@@ -977,7 +987,7 @@ const DB = {
   segNotes:{},         // per-segment notes
   ackAlerts:{}         // acknowledged notifications: alertKey -> {by, at}
 };
-const LEAVE_TYPES=['PTO','Sick','Holiday','Bereavement'];
+const LEAVE_TYPES=['PTO','Sick','Holiday','Bereavement','Regular'];
 // Attendance point system (WS Display policy, rev. 2026)
 const OCC_TYPES={
   CIE: {label:'Clock In Early (unapproved)', points:0.5,  auto:true},
@@ -1385,22 +1395,30 @@ function submitRequest(){
   REQ=null; toast('Correction request sent to your manager & HR'); render();
 }
 function applyRequest(reqId){
-  const r=DB.requests.find(x=>x.id===reqId); if(!r) return; const e=emp(r.emp);
-  const iso=wallToUtc(r.proposed.ymd, r.proposed.time, e.tz);
-  const reason=`Employee request: ${r.note}`;
-  if(r.kind==='add'){
-    const np={id:'p'+Date.now()+Math.random().toString(36).slice(2,5), emp:r.emp, ts:iso, type:r.proposed.type, source:'manual', editedBy:me().name};
-    DB.punches.push(np); chk(Store.addPunch(np),'Apply'); audit('add', r.emp, r.weekKey, np.id, null, {time:r.proposed.time,type:r.proposed.type}, me().name, reason);
-  } else {
-    const p=DB.punches.find(x=>x.id===r.targetId);
-    if(p){ const b={time:hhmm(p.ts,e),type:p.type}; p.ts=iso; p.type=r.proposed.type; p.source='manual'; p.editedBy=me().name; chk(Store.editPunch(p),'Apply');
-      audit('edit', r.emp, r.weekKey, p.id, b, {time:r.proposed.time,type:r.proposed.type}, me().name, reason); }
-  }
-  const a=getApproval(r.emp,r.weekKey);
-  if(a.employee||a.manager||a.hr){ resetWeekApprovals(r.emp,r.weekKey);
-    audit('reset', r.emp, r.weekKey, null,null,null, me().name, 'Approvals reset after applying request'); }
-  r.status='applied'; r.resolvedBy=me().name; r.resolvedAt=new Date().toISOString();
-  chk(Store.decidePunchRequest(r.id,'applied',me().name),'Apply'); toast('Correction applied'); render();
+  const r=DB.requests.find(x=>x.id===reqId); if(!r||r.status!=='pending') return;
+  const e=emp(r.emp);
+  const tgtP = (r.kind==='fix'&&r.targetId) ? DB.punches.find(x=>x.id===r.targetId) : null;
+  const ymd = tgtP ? partsInTz(tgtP.ts,e.tz).ymd : r.proposed.ymd;
+  const wk = sundayOf(ymd);
+  if(getApproval(r.emp,wk).locked){ toast('Period is locked — reopen it to apply'); return; }
+  const segs = daySegments(DB.punches.filter(x=>x.emp===r.emp && partsInTz(x.ts,e.tz).ymd===ymd));
+  const isEnd = SEG_END_TYPES.includes(r.proposed.type);
+  let target=null;
+  if(tgtP){ target = segs.find(s=>s.inId===r.targetId||s.outId===r.targetId); }
+  else if(isEnd){ // adding an out/meal-start/break-start → attach to an open shift missing its close
+    target = segs.find(s=>{ const st=DB.punches.find(p=>p.id===s.inId); return st && SEG_START_TYPES.includes(st.type) && !s.outId; }); }
+  else { // adding an in/meal-end/break-end → attach to an orphaned close needing an open
+    target = segs.find(s=>{ const en=DB.punches.find(p=>p.id===(s.outId||s.inId)); return en && SEG_END_TYPES.includes(en.type); }); }
+  openSegEdit(r.emp, wk, target?target.inId:'', target?(target.outId||''):'');
+  if(!SEG) return;
+  if(!target){ SEG.inYmd=SEG.outYmd=r.proposed.ymd; }   // fresh shift → default both sides to the requested day
+  // pre-fill the requested side with what the employee asked for
+  if(tgtP && SEG_END_TYPES.includes(tgtP.type)){ SEG.hasOut=true; SEG.outType=r.proposed.type; SEG.outYmd=r.proposed.ymd; SEG.outTime=r.proposed.time; }
+  else if(tgtP){ SEG.hasIn=true; SEG.inType=r.proposed.type; SEG.inYmd=r.proposed.ymd; SEG.inTime=r.proposed.time; }
+  else if(isEnd){ SEG.hasOut=true; SEG.outType=r.proposed.type; SEG.outYmd=r.proposed.ymd; SEG.outTime=r.proposed.time; }
+  else { SEG.hasIn=true; SEG.inType=r.proposed.type; SEG.inYmd=r.proposed.ymd; SEG.inTime=r.proposed.time; }
+  SEG.reqId=r.id; SEG.reason=`Employee request: ${r.note}`;
+  render();
 }
 function declineRequest(reqId){
   const r=DB.requests.find(x=>x.id===reqId); if(!r) return;
@@ -1565,6 +1583,7 @@ function render(){
   else if(PINSET) renderPinModal();
   else if(NEDIT) renderNoteModal();
   else if(LNOTE) renderLeaveNoteModal();
+  else if(SEG) renderSegModal();
   else if(PUNCH) renderPunchModal();
   else if(PAYVIEW) renderPayModal();
   else if(ACCR) renderAccrualModal();
@@ -1846,13 +1865,28 @@ function daySegments(punches){
   return segs;
 }
 function segKey(inId,L){return `${inId}|${L}`;}
+// hours that will actually be PAID for a set of shifts: worked time + paid-break credit (up to 12 min each),
+// matching how buildTimecard computes reg — so the SHIFT total reconciles with the WEEK/REGULAR totals.
+function shiftHrs(segs){ return segs.reduce((s,x)=> s + x.hrs + (x.breakPaid?Math.min(x.breakMin||0,12)/60:0), 0); }
 // punch photos captured by on-site tablets (stored in the punch-photos bucket)
 function punchPhoto(inId){ const p=DB.punches.find(x=>x.id===inId); return (p&&p.photoUrl)?p.photoUrl:null; }
-function photoCell(inId){ const ph=punchPhoto(inId);
-  return ph ? `<button class="phbtn" title="View punch photo" onclick="openPunchPhoto('${inId}')"><i class="ti ti-camera-filled"></i></button>`
+// a shift can carry a photo on its in and/or out punch — surface whichever exists so re-pairing never "loses" it
+function photoIdForSeg(inId,outId){ return [inId,outId].filter(Boolean).find(id=>punchPhoto(id)) || null; }
+function photoCell(inId,outId){ const pid=photoIdForSeg(inId,outId);
+  return pid ? `<button class="phbtn" title="View punch photo" onclick="openPunchPhoto('${pid}')"><i class="ti ti-camera-filled"></i></button>`
             : '<i class="ti ti-camera" title="No photo"></i>'; }
+let _photoEsc=null;
+function closePhotoView(){ const el=document.getElementById('photoView'); if(el) el.remove(); if(_photoEsc){ document.removeEventListener('keydown',_photoEsc); _photoEsc=null; } }
 async function openPunchPhoto(inId){ const ph=punchPhoto(inId); if(!ph){ toast('No photo'); return; }
-  const url=await Store.signedPhoto(ph); if(url) window.open(url,'_blank'); else toast('Could not open photo'); }function segApproved(inId,L){return !!DB.segApprovals[segKey(inId,L)];}
+  const url=await Store.signedPhoto(ph); if(!url){ toast('Could not open photo'); return; }
+  closePhotoView();
+  const el=document.createElement('div'); el.id='photoView'; el.className='photoview';
+  el.innerHTML=`<div class="photoview-inner"><button class="photoview-x" title="Close">&times;</button><img src="${url}" alt="Punch photo"></div>`;
+  el.addEventListener('click', ev=>{ if(ev.target===el || ev.target.classList.contains('photoview-x')) closePhotoView(); });
+  document.body.appendChild(el);
+  _photoEsc=ev=>{ if(ev.key==='Escape') closePhotoView(); }; document.addEventListener('keydown',_photoEsc);
+}
+function segApproved(inId,L){return !!DB.segApprovals[segKey(inId,L)];}
 function canToggleLayer(L,empId){ const u=me();
   if(u.role==='hr') return true;
   if(u.role==='manager' && L==='M' && u.manages?.includes(empId)) return true;
@@ -1866,7 +1900,7 @@ function closeRowMenu(){ if(_rowMenuEl){ _rowMenuEl.remove(); _rowMenuEl=null; }
 function showRowMenu(ev, kind, empId, wk, id1, id2){
   ev.preventDefault(); closeRowMenu();
   const el=document.createElement('div'); el.className='rowmenu';
-  const editFn = kind==='leave' ? `editLeaveById('${id1}')` : `openPunch('${empId}','${wk}','${id1}')`;
+  const editFn = kind==='leave' ? `editLeaveById('${id1}')` : `openSegEdit('${empId}','${wk}','${id1}','${id2||''}')`;
   const delFn  = kind==='leave' ? `deleteLeaveById('${id1}')` : `deleteSegmentDirect('${empId}','${wk}','${id1}','${id2||''}')`;
   el.innerHTML=`<button onclick="closeRowMenu();${editFn}"><i class="ti ti-pencil"></i> Edit</button>
     <button class="del" onclick="if(confirm('Delete this line? This removes the whole entry.')){closeRowMenu();${delFn}}else{closeRowMenu();}"><i class="ti ti-trash"></i> Delete line</button>`;
@@ -1932,14 +1966,15 @@ function resetWeekApprovals(empId, weekKey){
   const a=DB.approvals[approvalKey(empId,weekKey)]; if(a){a.employee=null;a.manager=null;a.hr=null;a.locked=false;}
 }
 function openPunch(empId, weekKey, punchId, rangeStart, rangeEnd){
-  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;SEG=null;
   if(getApproval(empId,weekKey).locked){ toast('Period is locked — reopen it to edit'); return; }
   const e=emp(empId);
   const rs=rangeStart||weekKey, re=rangeEnd||ymdAdd(weekKey,6);
   const base={empId, weekKey, rangeStart:rs, rangeEnd:re, kind:'punch', leaveType:LEAVE_TYPES[0], hours:8, premHours:1, premReason:'Missed rest break', note:''};
   if(punchId){ const p=DB.punches.find(x=>x.id===punchId); if(!p) return;
     PUNCH={...base, mode:'edit', id:punchId, ymd:partsInTz(p.ts,e.tz).ymd, time:hhmm(p.ts,e), type:p.type, reason:''}; }
-  else PUNCH={...base, mode:'add', id:null, ymd:rs, time:'08:00', type:'in', reason:''};
+  else { const today=todayYmd(e); const defYmd=(today>=rs&&today<=re)?today:rs;
+    PUNCH={...base, mode:'add', id:null, ymd:defYmd, time:'08:00', type:'in', reason:''}; }
   render();
 }
 function puSet(f,v){ PUNCH[f]=v; }
@@ -2041,6 +2076,129 @@ function renderPunchModal(){
   host.classList.add('show');
 }
 
+/* ---------- SEGMENT EDITOR — edit a whole shift (clock-in + clock-out together), Namely-style ----------
+   Opens on a timecard row (click a cell or right-click → Edit). Shows both sides of the shift so a
+   missing/unmatched punch can be fixed in one step, and defaults the dates to that row's own day. */
+let SEG=null;
+const SEG_START_TYPES=['in','meal_end','break_end'];
+const SEG_END_TYPES=['out','meal_start','break_start'];
+const SEG_IN_OPTS=[['in','Clock in'],['meal_end','Back from meal'],['break_end','Back from break']];
+const SEG_OUT_OPTS=[['out','Clock out'],['meal_start','Start meal'],['break_start','Start break']];
+// classify a segment's punch records into its start and end punch by TYPE (handles missing/unmatched rows)
+function segPunches(inId,outId){
+  const ids=[...new Set([inId,outId].filter(Boolean))];
+  let start=null,end=null;
+  ids.map(id=>DB.punches.find(p=>p.id===id)).filter(Boolean).forEach(p=>{
+    if(SEG_START_TYPES.includes(p.type)) start=p; else if(SEG_END_TYPES.includes(p.type)) end=p;
+  });
+  return {start,end};
+}
+function openSegEdit(empId, weekKey, inId, outId){
+  EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;PUNCH=null;
+  if(getApproval(empId,weekKey).locked){ toast('Period is locked — reopen it to edit'); return; }
+  const e=emp(empId);
+  const {start,end}=segPunches(inId, outId||null);
+  const anchor = start?start.ts : end?end.ts : null;                       // the day these fields default to
+  const ymd = anchor ? partsInTz(anchor,e.tz).ymd : weekKey;
+  SEG={ empId, weekKey,
+    inId:  start?start.id:null,  inType:  start?start.type:'in',
+    outId: end?end.id:null,      outType: end?end.type:'out',
+    hasIn: !!start,              hasOut: !!end,
+    inYmd:  start?partsInTz(start.ts,e.tz).ymd:ymd,  inTime:  start?hhmm(start.ts,e):'08:00',
+    outYmd: end?partsInTz(end.ts,e.tz).ymd:ymd,      outTime: end?hhmm(end.ts,e):'17:00',
+    reason:'' };
+  render();
+}
+function segSet(f,v){ SEG[f]=v; if(f==='hasIn'||f==='hasOut') render(); }
+function closeSeg(){ SEG=null; render(); }
+function saveSegEdit(){
+  if(!SEG.reason.trim()){ toast('Add a reason for the adjustment'); return; }
+  if(!SEG.hasIn && !SEG.hasOut){ toast('A shift needs at least a clock-in or a clock-out'); return; }
+  const e=emp(SEG.empId); const by=me().name; const reason=SEG.reason.trim();
+  const inUtc  = SEG.hasIn  ? wallToUtc(SEG.inYmd,  SEG.inTime,  e.tz) : null;
+  const outUtc = SEG.hasOut ? wallToUtc(SEG.outYmd, SEG.outTime, e.tz) : null;
+  if(inUtc && outUtc && new Date(outUtc)<=new Date(inUtc)){ toast('Time out must be after time in'); return; }
+  // every week these punches touch (old day + new day) needs its approvals reset
+  const weeks=new Set();
+  [SEG.inId,SEG.outId].filter(Boolean).forEach(id=>{ const p=DB.punches.find(x=>x.id===id); if(p) weeks.add(sundayOf(partsInTz(p.ts,e.tz).ymd)); });
+  if(SEG.hasIn)  weeks.add(sundayOf(SEG.inYmd));
+  if(SEG.hasOut) weeks.add(sundayOf(SEG.outYmd));
+  const affected=[];
+  // ---- clock-in side ----
+  if(SEG.hasIn){
+    if(SEG.inId){ const p=DB.punches.find(x=>x.id===SEG.inId); affected.push(p.id);
+      if(new Date(p.ts).getTime()!==new Date(inUtc).getTime() || p.type!==SEG.inType){ const b={time:hhmm(p.ts,e),type:p.type};
+        p.ts=inUtc; p.type=SEG.inType; p.source='manual'; p.editedBy=by; Store.editPunch(p);
+        audit('edit',SEG.empId,sundayOf(SEG.inYmd),p.id,b,{time:SEG.inTime,type:SEG.inType},by,reason); } }
+    else { const id='p'+Date.now()+Math.random().toString(36).slice(2,5);
+      const np={id, emp:SEG.empId, ts:inUtc, type:SEG.inType, source:'manual', editedBy:by};
+      DB.punches.push(np); Store.addPunch(np);
+      audit('add',SEG.empId,sundayOf(SEG.inYmd),id,null,{time:SEG.inTime,type:SEG.inType},by,reason); affected.push(id); }
+  } else if(SEG.inId){ const p=DB.punches.find(x=>x.id===SEG.inId);
+    DB.punches=DB.punches.filter(x=>x.id!==SEG.inId); Store.removePunch(SEG.inId);
+    audit('delete',SEG.empId,sundayOf(partsInTz(p.ts,e.tz).ymd),SEG.inId,{type:SEG.inType},null,by,reason); }
+  // ---- clock-out side ----
+  if(SEG.hasOut){
+    if(SEG.outId){ const p=DB.punches.find(x=>x.id===SEG.outId); affected.push(p.id);
+      if(new Date(p.ts).getTime()!==new Date(outUtc).getTime() || p.type!==SEG.outType){ const b={time:hhmm(p.ts,e),type:p.type};
+        p.ts=outUtc; p.type=SEG.outType; p.source='manual'; p.editedBy=by; Store.editPunch(p);
+        audit('edit',SEG.empId,sundayOf(SEG.outYmd),p.id,b,{time:SEG.outTime,type:SEG.outType},by,reason); } }
+    else { const id='p'+Date.now()+Math.random().toString(36).slice(2,6);
+      const np={id, emp:SEG.empId, ts:outUtc, type:SEG.outType, source:'manual', editedBy:by};
+      DB.punches.push(np); Store.addPunch(np);
+      audit('add',SEG.empId,sundayOf(SEG.outYmd),id,null,{time:SEG.outTime,type:SEG.outType},by,reason); affected.push(id); }
+  } else if(SEG.outId){ const p=DB.punches.find(x=>x.id===SEG.outId);
+    DB.punches=DB.punches.filter(x=>x.id!==SEG.outId); Store.removePunch(SEG.outId);
+    audit('delete',SEG.empId,sundayOf(partsInTz(p.ts,e.tz).ymd),SEG.outId,{type:SEG.outType},null,by,reason); }
+  // reason → the affected shift's note row
+  if(affected.length){ const anchor=segInIdForPunch(SEG.empId,(SEG.hasIn?SEG.inYmd:SEG.outYmd),affected[0]);
+    DB.segNotes[anchor]=reason; Store.setNote(anchor, SEG.empId, reason, by); }
+  // if this edit came from applying an employee's web-clock request, close that request out
+  if(SEG.reqId){ const rq=DB.requests.find(x=>x.id===SEG.reqId);
+    if(rq && rq.status==='pending'){ rq.status='applied'; rq.resolvedBy=by; rq.resolvedAt=new Date().toISOString();
+      chk(Store.decidePunchRequest(rq.id,'applied',by),'Apply'); } }
+  weeks.forEach(wk=>resetWeekApprovals(SEG.empId,wk));
+  const wasReq=!!SEG.reqId; SEG=null; toast(wasReq?'Request applied':'Shift saved'); render();
+}
+function deleteSegLine(){
+  if(!SEG.reason.trim()){ toast('Add a reason before deleting'); return; }
+  const e=emp(SEG.empId); const by=me().name; const reason=SEG.reason.trim(); const weeks=new Set();
+  [SEG.inId,SEG.outId].filter(Boolean).forEach(id=>{ const p=DB.punches.find(x=>x.id===id);
+    if(p){ weeks.add(sundayOf(partsInTz(p.ts,e.tz).ymd)); DB.punches=DB.punches.filter(x=>x.id!==id); Store.removePunch(id); } });
+  audit('delete',SEG.empId,[...weeks][0]||SEG.weekKey,SEG.inId||SEG.outId,{seg:'line'},null,by,reason);
+  weeks.forEach(wk=>resetWeekApprovals(SEG.empId,wk));
+  SEG=null; toast('Line removed'); render();
+}
+function renderSegModal(){
+  const host=document.getElementById('modal'); const e=emp(SEG.empId);
+  let lenTxt='';
+  if(SEG.hasIn && SEG.hasOut){
+    const diff=(new Date(wallToUtc(SEG.outYmd,SEG.outTime,e.tz))-new Date(wallToUtc(SEG.inYmd,SEG.inTime,e.tz)))/3600000;
+    if(diff>0) lenTxt=`<span class="seglen">Shift ${h2(diff)}</span>`;
+  }
+  const row=(side)=>{ const isIn=side==='in';
+    const on=isIn?SEG.hasIn:SEG.hasOut, ymd=isIn?SEG.inYmd:SEG.outYmd, time=isIn?SEG.inTime:SEG.outTime;
+    const curType=isIn?SEG.inType:SEG.outType, opts=isIn?SEG_IN_OPTS:SEG_OUT_OPTS;
+    return `<div class="segrowedit ${on?'':'off'}">
+      <label class="segchk"><input type="checkbox" ${on?'checked':''} onchange="segSet('${isIn?'hasIn':'hasOut'}',this.checked)"></label>
+      <select ${on?'':'disabled'} onchange="segSet('${isIn?'inType':'outType'}',this.value)">${opts.map(([v,l])=>`<option value="${v}" ${curType===v?'selected':''}>${l}</option>`).join('')}</select>
+      <input type="date" value="${ymd}" ${on?'':'disabled'} onchange="segSet('${isIn?'inYmd':'outYmd'}',this.value)">
+      <input type="time" value="${time}" ${on?'':'disabled'} onchange="segSet('${isIn?'inTime':'outTime'}',this.value)">
+    </div>`; };
+  const canDelete = SEG.inId || SEG.outId;
+  host.innerHTML=`<div class="modalcard"><div class="modalhead">
+    <div><b>Edit shift</b><div class="hint">${e.name} · ${md(SEG.hasIn?SEG.inYmd:SEG.outYmd)}</div></div>
+    ${lenTxt}<button class="btn ghost sm" onclick="closeSeg()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      ${row('in')}
+      ${row('out')}
+      <div class="field" style="margin-top:14px"><label>Reason for adjustment (required)</label>
+        <input value="${(SEG.reason||'').replace(/"/g,'&quot;')}" oninput="SEG.reason=this.value" placeholder="e.g. Employee forgot to clock out"></div>
+    </div>
+    <div class="modalfoot">${canDelete?`<button class="btn ghost" style="color:var(--bad);margin-right:auto" onclick="deleteSegLine()"><i class="ti ti-trash"></i> Delete line</button>`:''}
+      <button class="btn ghost" onclick="closeSeg()">Cancel</button><button class="btn primary" onclick="saveSegEdit()">Save</button></div></div>`;
+  host.classList.add('show');
+}
 function renderNoteModal(){
   const host=document.getElementById('modal');
   host.innerHTML=`<div class="modalcard"><div class="modalhead"><div><b>Segment note</b></div>
@@ -2089,7 +2247,7 @@ function renderTimecard(empId, weekKey, viewerLayer){
     const wd=dt.toLocaleDateString('en-US',{weekday:'short',timeZone:'UTC'});
     const dayExc = d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).length>0;
     const segs=daySegments(d.punches);
-    const shift=segs.reduce((s,x)=>s+x.hrs,0);
+    const shift=shiftHrs(segs);
     const editable = can('edit',empId) && !a.locked;
     if(!segs.length){
       body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td colspan="3"></td><td></td><td></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
@@ -2106,8 +2264,8 @@ function renderTimecard(empId, weekKey, viewerLayer){
         <td class="apcol">${box(s.inId,'E')}</td><td class="apcol">${box(s.inId,'M')}</td><td class="apcol">${box(s.inId,'O')}</td>
         <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
         <td class="brk">${bl}</td>
-        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
-        <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
+        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openSegEdit('${empId}','${weekKey}','${s.inId}','${s.outId||''}')" title="Edit shift"`:''}>${inCell}</td>
+        <td class="${editable?'editcell':''}" ${editable?`onclick="openSegEdit('${empId}','${weekKey}','${s.inId}','${s.outId||''}')" title="Edit shift"`:''}>${outCell}</td>
         <td class="num">${s.out?h2(s.hrs):'—'}</td>
         <td class="num">${last?`<b>${h2(shift)}</b>`:''}</td>
         <td class="num">${veryLast?`<b>${h2(tc.total)}</b>`:''}</td>
@@ -2213,7 +2371,8 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
   // leave entries + auto company holidays for the period, grouped by day
   const leaveByDay={}; DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).forEach(l=>{ (leaveByDay[l.date]=leaveByDay[l.date]||[]).push(l); });
   const holByDay={}; holidaysInRange(start,stop).forEach(h=>{ (holByDay[h.date]=holByDay[h.date]||[]).push(h); });
-  const _leaveTot = DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop).reduce((s,l)=>s+l.hours,0) + holidaysInRange(start,stop).reduce((s,h)=>s+(h.hours||CFG.holidayHours),0);
+  const _regExtra = DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop && l.type==='Regular').reduce((s,l)=>s+l.hours,0);
+  const _leaveTot = DB.leave.filter(l=>l.emp===empId && l.date>=start && l.date<=stop && l.type!=='Regular').reduce((s,l)=>s+l.hours,0) + holidaysInRange(start,stop).reduce((s,h)=>s+(h.hours||CFG.holidayHours),0);
   const workedByDay={}; tc.days.forEach(d=>workedByDay[d.ymd]=d);
   const allDates=[...new Set([...tc.days.map(d=>d.ymd), ...Object.keys(leaveByDay), ...Object.keys(holByDay)])].sort();
   const dstr=ymd=>ymdD(ymd).toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'});
@@ -2256,7 +2415,7 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
     if(d){
     const dayExc=d.exceptions.filter(x=>!isExcused(empId,d.ymd,x)).length>0;
     const segs=daySegments(d.punches);
-    const shift=segs.reduce((s,x)=>s+x.hrs,0);
+    const shift=shiftHrs(segs);
     if(!segs.length){
       body+=`<tr class="tc-day"><td>${dayExc?'<span class="dot"></span>':''}</td><td class="apcol"></td><td class="apcol"></td><td class="apcol"></td><td></td><td class="edcol"></td><td class="brk"></td><td class="phcol"></td><td colspan="2" style="color:var(--muted)">${wd} ${dt.toLocaleDateString('en-US',{month:'numeric',day:'numeric',timeZone:'UTC'})} — no worked segments</td><td class="num">—</td><td></td><td></td></tr>`;
     }
@@ -2273,9 +2432,9 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
         <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
         <td class="edcol">${s.manual?'<b>Y</b>':''}</td>
         <td class="brk">${bl}</td>
-        <td class="phcol">${photoCell(s.inId)}</td>
-        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${d.weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
-        <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${d.weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
+        <td class="phcol">${photoCell(s.inId,s.outId)}</td>
+        <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openSegEdit('${empId}','${d.weekKey}','${s.inId}','${s.outId||''}')" title="Edit shift"`:''}>${inCell}</td>
+        <td class="${editable?'editcell':''}" ${editable?`onclick="openSegEdit('${empId}','${d.weekKey}','${s.inId}','${s.outId||''}')" title="Edit shift"`:''}>${outCell}</td>
         <td class="num">${s.out?h2(s.hrs):'—'}</td>
         <td class="num">${last?`<b>${h2(shift)}</b>`:''}</td>
         <td class="num">${showWeek?`<b>${h2(d.weekTotal)}</b>`:''}</td>
@@ -2310,8 +2469,8 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
         <div class="hint">${TZ[e.tz]} · ${STATE_RULES[e.loc]?STATE_RULES[e.loc].label:e.loc} rules${locked?' · <span class="pill ok"><i class="ti ti-lock"></i> Locked</span>':''}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}${_leaveTot?` · Leave ${h2(_leaveTot)}`:''}</div>
-        <div style="font-size:20px;font-weight:700">${h2(tc.total+_leaveTot)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
+        <div style="font-size:12px;color:var(--muted)">Reg ${h2(tc.reg+_regExtra)} · OT ${h2(tc.ot)}${tc.dt?` · DT ${h2(tc.dt)}`:''}${_leaveTot?` · Leave ${h2(_leaveTot)}`:''}</div>
+        <div style="font-size:20px;font-weight:700">${h2(tc.total+_regExtra+_leaveTot)} <span style="font-size:12px;color:var(--muted);font-weight:500">hrs</span></div>
       </div>
     </div>
     ${actions?`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${actions}</div>`:''}
@@ -2789,10 +2948,11 @@ function buildPayrollRows(start,stop){
     const w=buildPeriod(e.id,start,stop); const lv=leavePeriod(e.id,start,stop);
     const pto=lv.PTO+lv.Bereavement, sick=lv.Sick, hol=holidayHours(e.id,start,stop);
     const prem=premiumHours(e.id,start,stop).total;
-    const total=w.reg+w.ot+w.dt+prem+pto+sick+hol; const rate=e.rate||0;
-    const gross=rate*(w.reg+pto+sick+hol+prem)+rate*1.5*w.ot+rate*2*w.dt;
+    const reg=w.reg+(lv.Regular||0);                    // CEO-approved "Regular" timesheet hours pay as regular, not PTO
+    const total=reg+w.ot+w.dt+prem+pto+sick+hol; const rate=e.rate||0;
+    const gross=rate*(reg+pto+sick+hol+prem)+rate*1.5*w.ot+rate*2*w.dt;
     return {emp:e.id, name:e.name, empId:e.empId, dept:e.dept||'', state:e.loc||'', email:e.email||'',
-      rate, reg:w.reg, ot1:w.ot, ot2:w.dt, prem, pto, sick, holiday:hol, total, gross:Math.round(gross*100)/100};
+      rate, reg, ot1:w.ot, ot2:w.dt, prem, pto, sick, holiday:hol, total, gross:Math.round(gross*100)/100};
   });
 }
 function batchForPeriod(start,stop){ return DB.payrollBatches.filter(b=>b.start===start && b.stop===stop).sort((a,b)=>new Date(b.at)-new Date(a.at))[0]; }
@@ -3464,10 +3624,11 @@ function viewHours(){
     const idx=list.findIndex(x=>x.id===e.id);
     const tab=HOURS.tab||'hours';
     const _lt=leavePeriod(e.id,HOURS.start,HOURS.stop); const _hol=holidayHours(e.id,HOURS.start,HOURS.stop);
+    const _regExtra=_lt.Regular||0;                       // CEO-approved regular timesheet hours — paid as regular
     const leaveTot=_lt.PTO+_lt.Sick+_lt.Bereavement+_hol;
-    const grandTot=pd.total+leaveTot;
+    const grandTot=pd.total+leaveTot+_regExtra;
     const totals=`<div class="totalsbar">
-      <div class="tcell"><span>Regular</span><b>${h2(pd.reg)}</b></div>
+      <div class="tcell"><span>Regular</span><b>${h2(pd.reg+_regExtra)}</b></div>
       <div class="tcell"><span>OT1</span><b>${h2(pd.ot)}</b></div>
       <div class="tcell"><span>OT2</span><b>${h2(pd.dt)}</b></div>
       <div class="tcell leave"><span>Leave</span><b>${h2(leaveTot)}</b></div>
@@ -3756,7 +3917,7 @@ function recordFor(e,start,stop){
   const w=buildPeriod(e.id,start,stop); const lv=leavePeriod(e.id,start,stop);
   const premObj=premiumHours(e.id,start,stop); const hol=holidayHours(e.id,start,stop);
   const pto=lv.PTO+lv.Bereavement, sick=lv.Sick; const pts=rollingPoints(e.id);
-  const rate=e.rate||0; const worked=w.reg+w.ot+w.dt; const total=worked+premObj.total+pto+sick+hol;
+  const rate=e.rate||0; const reg=w.reg+(lv.Regular||0); const worked=reg+w.ot+w.dt; const total=worked+premObj.total+pto+sick+hol;
   const cols=REPORT?.cols||[];
   const wantPto=cols.some(c=>REPORT_FIELDS[c]&&REPORT_FIELDS[c].cat==='timeoff');
   const snap=wantPto?ptoSnapshot(e):null;
@@ -3764,10 +3925,10 @@ function recordFor(e,start,stop){
   return {empId:e.empId, name:e.name, dept:e.dept, state:e.loc, manager:emp(e.mgr)?emp(e.mgr).name:'', email:e.email||'',
     hireDate:e.hireDate||'', tenure:e.hireDate?tenureYears(e):'', ptoElig:e.ptoEligible!==false?'Yes':'No',
     leadership:e.leadership?'Yes':'—', remote:e.remote!==false?'Yes':'No', tz:TZ[e.tz]||'',
-    rate, reg:w.reg, ot1:w.ot, ot2:w.dt, prem:premObj.total, pto, sick, holiday:hol, total,
+    rate, reg, ot1:w.ot, ot2:w.dt, prem:premObj.total, pto, sick, holiday:hol, total,
     daysWorked:cols.includes('daysWorked')?daysWorkedIn(e.id,start,stop):0,
-    regPay:rate*w.reg, otPay:rate*1.5*w.ot+rate*2*w.dt,
-    grossPay:rate*(w.reg+pto+sick+hol+premObj.total)+rate*1.5*w.ot+rate*2*w.dt,
+    regPay:rate*reg, otPay:rate*1.5*w.ot+rate*2*w.dt,
+    grossPay:rate*(reg+pto+sick+hol+premObj.total)+rate*1.5*w.ot+rate*2*w.dt,
     otPct:worked>0?(w.ot+w.dt)/worked*100:0, mealDays:premObj.auto, premRest:premObj.manual,
     ptoAccrued:snap?snap.ptoAccrued:0, ptoUsed:snap?snap.ptoUsed:0, ptoAvail:snap?snap.ptoAvail:0,
     sickUsed:snap?snap.sickUsed:0, sickAvail:snap?snap.sickAvail:0, upcomingPto:com?com.PTO+com.Bereavement:0,
@@ -4237,7 +4398,7 @@ function viewConfig(){
           <td><button class="toggle ${l.active?'on':''}" onclick="toggleLocActive('${l.id}')" title="${l.active?'Active':'Inactive'}"><span></span></button></td>
           <td style="text-align:right"><button class="excuse-btn" onclick="openLoc('${l.id}')">edit</button></td>
         </tr>`).join('')}
-      </tbody></table>`:`<div class="empty">No sites yet. Add your CA warehouse and PA locations.</div>`}
+      </tbody></table>`:`<div class="empty">No sites yet. Add your CA warehouse, PA, and MX locations.</div>`}
       <div class="hint" style="margin-top:12px"><i class="ti ti-info-circle"></i> <b>Remote</b> employees (Remote = on in the Employee tab) punch from anywhere. <b>On-site</b> employees (Remote = off) will be allowed to clock in only within an active site's radius. Enforcement runs in the <b>web clock</b> — once that's wired, an on-site punch outside every active radius is blocked, and the fixed tablets capture a photo with each punch.</div>
     </div>
 

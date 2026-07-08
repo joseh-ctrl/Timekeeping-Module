@@ -2256,8 +2256,8 @@ function dayPunchBounds(empId, ymd, idx){
 }
 function occExcuseKey(emp,ymd,code){return `${emp}|${ymd}|${code}`;}
 function isOccExcused(emp,ymd,code){return !!DB.occExcused[occExcuseKey(emp,ymd,code)];}
-function dayOccurrences(empId, ymd, idx, floor){
-  const today=todayYmd(emp(empId));
+function dayOccurrences(empId, ymd, idx, floor, today){
+  if(today===undefined) today=todayYmd(emp(empId));
   if(ymd>today) return [];                                        // future day — nothing has happened yet
   if(floor===undefined) floor=trackingStartYmd(empId, idx);
   if(!floor || ymd<floor) return [];                              // before this employee was tracked — don't infer absences
@@ -2274,10 +2274,11 @@ function dayOccurrences(empId, ymd, idx, floor){
   return occ;
 }
 function periodOccurrences(empId, start, stop){
+  const today=todayYmd(emp(empId));
   const idx=empPunchIndex(empId); const floor=trackingStartYmd(empId, idx);
   const out=[]; let cur=start;
   while(cur<=stop){
-    dayOccurrences(empId,cur,idx,floor).forEach(o=>out.push({...o, date:cur}));
+    dayOccurrences(empId,cur,idx,floor,today).forEach(o=>out.push({...o, date:cur}));
     DB.occurrences.filter(m=>m.emp===empId && m.date===cur).forEach(m=>out.push({code:m.code, points:OCC_TYPES[m.code].points, date:cur, auto:false, id:m.id, note:m.note, excused:isOccExcused(empId,cur,m.code)}));
     cur=ymdAdd(cur,1);
   }
@@ -2286,8 +2287,11 @@ function periodOccurrences(empId, start, stop){
 function rollingPoints(empId){
   const today=todayYmd(emp(empId)); const cutoff=ymdAdd(today,-365);
   const idx=empPunchIndex(empId); const floor=trackingStartYmd(empId, idx);
-  let pts=0; let cur=floor && floor>cutoff ? floor : cutoff;      // never scan before tracking began
-  while(cur<=today){ dayOccurrences(empId,cur,idx,floor).forEach(o=>{ if(!o.excused) pts+=o.points; }); cur=ymdAdd(cur,1); }
+  let pts=0;
+  if(floor){                                                     // no floor → no auto occurrences to scan; skip the daily loop
+    let cur=floor>cutoff ? floor : cutoff;
+    while(cur<=today){ dayOccurrences(empId,cur,idx,floor,today).forEach(o=>{ if(!o.excused) pts+=o.points; }); cur=ymdAdd(cur,1); }
+  }
   DB.occurrences.filter(m=>m.emp===empId && m.date>=cutoff && m.date<=today && !isOccExcused(empId,m.date,m.code)).forEach(m=>pts+=OCC_TYPES[m.code].points);
   return Math.round(pts*100)/100;
 }
@@ -3679,7 +3683,7 @@ function seedState(){
 
 function recomputeAllApprovals(){
   DB.employees.filter(e=>e.role==='employee').forEach(e=>{
-    const weeks=new Set(DB.punches.filter(p=>p.emp===e.id).map(p=>weekKeyFor(p.ts,e)));
+    const weeks=new Set(punchesForEmp(e.id).map(p=>weekKeyFor(p.ts,e)));
     weeks.forEach(wk=>recomputeWeekApproval(e.id,wk));
   });
 }

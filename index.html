@@ -318,6 +318,8 @@ tr:last-child td{border-bottom:none}
 
 /* Employee ID + placeholder */
 .empid{font-variant-numeric:tabular-nums;font-weight:600;color:var(--muted)}
+.cell-in{padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#fbfcfe;font-size:12.5px;color:var(--ink)}
+.cell-in:focus{outline:none;border-color:var(--accent);background:#fff}
 .ph{text-align:center;padding:38px 20px}
 .ph>i{font-size:44px;color:var(--accent);opacity:.5}
 .ph h3{font-size:16px;margin:12px 0 4px}
@@ -565,7 +567,7 @@ const Store = (() => {
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc };
     },
-    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date'};
+    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name'};
       const row={}; Object.keys(patch).forEach(k=>row[m[k]||k]=patch[k]); return sb.from('employees').update(row).eq('id',id); },
     addPunch(p){ return enabled ? sb.from('punches').insert({id:p.id,employee_id:p.emp,ts:p.ts,type:p.type,source:p.source||'manual',edited_by:p.editedBy}) : null; },
     editPunch(p){ return enabled ? sb.from('punches').update({ts:p.ts,type:p.type,source:'manual',edited_by:p.editedBy}).eq('id',p.id) : null; },
@@ -941,9 +943,29 @@ function dedupPunches(list){
   });
   return out.sort((a,b)=>new Date(a.ts)-new Date(b.ts));
 }
+/* Punch index: buckets every punch by employee+week ONCE, so buildTimecard/period
+   math is O(1) lookups instead of re-scanning the whole punch table per employee.
+   Auto-rebuilds only when DB.punches changes (all mutations swap the ref or length). */
+let _pIdx=null, _pIdxRef=null, _pIdxLen=-1;
+function punchIndex(){
+  if(_pIdx && _pIdxRef===DB.punches && _pIdxLen===DB.punches.length) return _pIdx;
+  const byWeek=new Map(), byEmp=new Map();
+  for(const p of DB.punches){
+    const e=emp(p.emp); if(!e) continue;
+    let we=byEmp.get(p.emp); if(!we){ we=[]; byEmp.set(p.emp,we); } we.push(p);
+    const wk=weekKeyFor(p.ts,e);
+    let m=byWeek.get(p.emp); if(!m){ m=new Map(); byWeek.set(p.emp,m); }
+    let a=m.get(wk); if(!a){ a=[]; m.set(wk,a); } a.push(p);
+  }
+  _pIdx={byWeek,byEmp}; _pIdxRef=DB.punches; _pIdxLen=DB.punches.length;
+  return _pIdx;
+}
+function punchesForWeek(empId,weekKey){ return punchIndex().byWeek.get(empId)?.get(weekKey) || []; }
+function punchesForEmp(empId){ return punchIndex().byEmp.get(empId) || []; }
+
 function buildTimecard(empId, weekKey){
   const e = emp(empId); const rule = ruleFor(e);
-  const wp = dedupPunches(DB.punches.filter(p=>p.emp===empId && weekKeyFor(p.ts,e)===weekKey));
+  const wp = dedupPunches(punchesForWeek(empId, weekKey));
   const byDay = {};
   wp.forEach(p=>{ const k=partsInTz(p.ts,e.tz).ymd; (byDay[k]=byDay[k]||[]).push(p); });
 
@@ -2198,7 +2220,7 @@ function schedBounds(segs){
 // one pass over an employee's punches → { ymd: {any, firstIn, lastOut} } for fast day lookups
 function empPunchIndex(empId){
   const e=emp(empId); const idx={};
-  DB.punches.filter(p=>p.emp===empId).forEach(p=>{
+  punchesForEmp(empId).forEach(p=>{
     const q=partsInTz(p.ts,e.tz); const m=q.hh*60+q.mm;
     const d=idx[q.ymd]||(idx[q.ymd]={any:false,ins:[],outs:[]});
     d.any=true; if(p.type==='in') d.ins.push(m); else if(p.type==='out') d.outs.push(m);
@@ -3570,9 +3592,10 @@ function viewEmployee(){
     <table class="roster"><thead><tr><th>ID</th><th>Employee</th><th>Dept</th><th>State</th><th>Timezone</th><th>Manager</th><th class="num">Rate $/hr</th><th>Web clock</th><th>Remote</th></tr></thead><tbody>
     ${emps.map(e=>`
       <tr>
-        <td><span class="empid">${e.empId||'—'}</span></td>
-        <td><div class="who">${e.name}</div></td>
-        <td>${e.dept||'—'}</td>
+        <td><input class="cell-in" style="width:66px" value="${e.empId||''}" onchange="setField('${e.id}','empId',this.value.trim())"></td>
+        <td><div class="who">${e.name}</div>
+            <input class="cell-in" type="email" style="width:190px;margin-top:4px" placeholder="email address" value="${e.email||''}" onchange="setField('${e.id}','email',this.value.trim())"></td>
+        <td><input class="cell-in" style="width:140px" value="${e.dept||''}" onchange="setField('${e.id}','dept',this.value.trim())"></td>
         <td><select onchange="setField('${e.id}','loc',this.value)">
             ${STATES.map(s=>`<option value="${s}" ${e.loc===s?'selected':''}>${STATE_RULES[s].label} (${s})</option>`).join('')}
           </select></td>
@@ -3587,7 +3610,7 @@ function viewEmployee(){
         <td><button class="toggle ${e.remote!==false?'on':''}" onclick="setField('${e.id}','remote',${e.remote!==false?'false':'true'})" title="${e.remote!==false?'Remote — stays signed in on their own device':'On-site terminal — auto-signs-out after each punch'}"><span></span></button></td>
       </tr>`).join('')}
     </tbody></table>
-    <div class="hint">Changes save immediately. <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch so the next person enters their own PIN.</div>
+    <div class="hint">Changes save immediately. <b>ID</b>, <b>email</b>, and <b>department</b> are now editable here (no need to open Supabase). <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch so the next person enters their own PIN.</div>
   </div>
 
   <div class="card">

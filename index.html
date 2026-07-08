@@ -523,7 +523,7 @@ const Store = (() => {
   const inEmp = r => ({ id:r.id, name:r.name, empId:r.emp_id, loc:r.state, dept:r.dept, tz:r.tz, mgr:r.manager_id,
     role:r.role, rate:+r.rate||0, webPunch:r.web_punch, remote:r.remote, email:r.email,
     hireDate:r.hire_date||null, leadership:!!r.leadership, ptoEligible:r.pto_eligible!==false,
-    rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null,
+    rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null, viewAll:!!r.view_all,
     pto:{allot:+r.pto_allot||0,used:+r.pto_used||0}, sick:{allot:+r.sick_allot||0,used:+r.sick_used||0} });
   const inPunch = r => ({ id:r.id, emp:r.employee_id, ts:r.ts, type:r.type, source:r.source, editedBy:r.edited_by });
   const inReq = r => ({ id:r.id, emp:r.employee_id, weekKey:r.week_key, kind:r.kind, targetId:r.target_punch_id,
@@ -1351,8 +1351,10 @@ function render(){
 /* ---------- DASHBOARD ---------- */
 function scopeEmployees(){
   const u=me();
-  if(u.role==='hr') return DB.employees.filter(e=>e.role==='employee');
-  if(u.role==='manager') return DB.employees.filter(e=>u.manages?.includes(e.id));
+  if(u.role==='hr') return DB.employees.filter(e=>e.role==='employee' || !!e.hireDate);
+  if(u.role==='manager') return u.viewAll
+      ? DB.employees.filter(e=>e.role==='employee' || !!e.hireDate)   // exec: can access everyone
+      : DB.employees.filter(e=>u.manages?.includes(e.id));            // manager: their team
   return [me()];
 }
 
@@ -1361,7 +1363,7 @@ function scopeEmployees(){
 function periodCutoff(){ const t=todayYmd(me()); const pp=payPeriodStart(t); return ymdAdd(ymdAdd(pp,13),2); }
 // per-employee alerts across the current pay period; also period-level (unapproved before cutoff)
 function alertsFor(u){
-  const scope = u.role==='hr' ? DB.employees.filter(e=>e.role==='employee')
+  const scope = u.role==='hr' ? DB.employees.filter(e=>e.role==='employee' || !!e.hireDate)
               : DB.employees.filter(e=>u.manages?.includes(e.id));
   const t=todayYmd(me()); const start=payPeriodStart(t), stop=ymdAdd(start,13);
   const cutoff=periodCutoff(); const daysToCutoff=Math.round((Date.parse(cutoff)-Date.parse(t))/86400000);
@@ -2113,7 +2115,7 @@ function initHours(){
   const t=todayYmd(pick); HOURS.empId=pick.id; HOURS.start=payPeriodStart(t); HOURS.stop=ymdAdd(HOURS.start,13);
 }
 function filterSortEmps(sort, search){
-  let list=DB.employees.filter(e=>e.role==='employee');
+  let list=DB.employees.filter(e=>e.role==='employee' || !!e.hireDate);
   const q=(search||'').toLowerCase().trim();
   if(q) list=list.filter(e=>e.name.toLowerCase().includes(q)||(e.empId||'').includes(q));
   const last=n=>n.trim().split(/\s+/).slice(-1)[0];
@@ -2149,7 +2151,7 @@ function empListPanel(cfg){
         <option value="loc" ${cfg.sort==='loc'?'selected':''}>Location</option></select></label>
       <div class="emp-search"><i class="ti ti-search"></i>
         <input placeholder="Search name or ID…" value="${(cfg.search||'').replace(/"/g,'&quot;')}" onchange="${cfg.onSearch}(this.value)" onkeydown="if(event.key==='Enter')${cfg.onSearch}(this.value)"></div>
-      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
+      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee'||!!e.hireDate).length}</div>
     </div><div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div></div>`;
 }
 function hoursSelect(id){ ACCR=null;ACCRED=null; HOURS.empId=id; HOURS.listOpen=false; render(); }
@@ -3060,7 +3062,7 @@ function viewHours(){
       <div class="emp-search"><i class="ti ti-search"></i>
         <input placeholder="Search name or ID…" value="${(HOURS.search||'').replace(/"/g,'&quot;')}"
                onchange="hoursSearch(this.value)" onkeydown="if(event.key==='Enter')hoursSearch(this.value)"></div>
-      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee').length}</div>
+      <div class="emplist-count">Showing ${list.length} of ${DB.employees.filter(e=>e.role==='employee'||!!e.hireDate).length}</div>
     </div>
     <div class="emplist-body">${rows||'<div class="empty">No matches.</div>'}</div>
   </div>`;

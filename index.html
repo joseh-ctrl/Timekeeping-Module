@@ -1162,7 +1162,7 @@ function punchesForWeek(empId,weekKey){ return punchIndex().byWeek.get(empId)?.g
 function punchesForEmp(empId){ return punchIndex().byEmp.get(empId) || []; }
 
 function buildTimecard(empId, weekKey){
-  const e = emp(empId); const rule = ruleFor(e);
+  const e = emp(empId); const rule = ruleFor(e); const eToday = todayYmd(e);
   const wp = dedupPunches(punchesForWeek(empId, weekKey));
   const byDay = {};
   wp.forEach(p=>{ const k=partsInTz(p.ts,e.tz).ymd; (byDay[k]=byDay[k]||[]).push(p); });
@@ -1179,7 +1179,7 @@ function buildTimecard(empId, weekKey){
       else if(p.type==='break_start'){ breakT=t; if(inT){worked+=t-inT; inT=null;} }
       else if(p.type==='break_end'){ if(breakT){ const dur=(t-breakT)/60000; worked+=Math.min(dur,12)*60000; inT=t; breakT=null; } } // paid up to 12 min, excess unpaid
     });
-    if(inT) exceptions.push('Missing out punch');
+    if(inT && ymd<eToday) exceptions.push('Missing out punch'); // open "in" on a past day = real missed punch; on today it just means still on the clock
     const hrs = worked/3600000;
     // meal-law flags (state-driven, e.g. CA: 30-min meal before end of 5th hour) -> premium owed
     if(rule.mealLaw){

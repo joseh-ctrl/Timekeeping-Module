@@ -525,6 +525,8 @@ tr:last-child td{border-bottom:none}
 .tcard .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad)}
 .tcard .edcol{text-align:center;width:52px} .tcard td.edcol b{color:var(--accent);font-weight:800}
 .tcard .phcol{text-align:center;width:54px;color:#c7d0e0}
+.phbtn{background:var(--okbg);color:#166534;border-radius:7px;width:30px;height:26px;display:inline-grid;place-items:center;font-size:15px}
+.phbtn:hover{background:#bbf7d0}
 .tcard .brk{color:var(--muted);font-variant-numeric:tabular-nums}
 .tcard .tin b{color:var(--navy)}
 .tcard .editcell{cursor:pointer}
@@ -700,7 +702,7 @@ const Store = (() => {
     hireDate:r.hire_date||null, leadership:!!r.leadership, ptoEligible:r.pto_eligible!==false,
     rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null, viewAll:!!r.view_all,
     pto:{allot:+r.pto_allot||0,used:+r.pto_used||0}, sick:{allot:+r.sick_allot||0,used:+r.sick_used||0} });
-  const inPunch = r => ({ id:r.id, emp:r.employee_id, ts:r.ts, type:r.type, source:r.source, editedBy:r.edited_by });
+  const inPunch = r => ({ id:r.id, emp:r.employee_id, ts:r.ts, type:r.type, source:r.source, editedBy:r.edited_by, photoUrl:r.photo_url||null });
   const inReq = r => ({ id:r.id, emp:r.employee_id, weekKey:r.week_key, kind:r.kind, targetId:r.target_punch_id,
     proposed:{ymd:r.proposed_ymd,time:r.proposed_time,type:r.proposed_type}, note:r.note, status:r.status, by:r.created_by, at:r.created_at });
   const inPto = r => ({ id:r.id, emp:r.employee_id, type:r.type, days:r.days, note:r.note, status:r.status,
@@ -775,6 +777,7 @@ const Store = (() => {
     removeReportConfig(id){ return enabled ? sb.from('report_configs').delete().eq('id',id) : null; },
     saveLocation(l){ return enabled ? sb.from('punch_locations').upsert({id:l.id,name:l.name,state:l.state||null,lat:l.lat,lng:l.lng,radius_m:l.radius,active:l.active,updated_at:new Date().toISOString()}) : null; },
     removeLocation(id){ return enabled ? sb.from('punch_locations').delete().eq('id',id) : null; },
+    async signedPhoto(path){ if(!enabled||!path) return null; const { data, error } = await sb.storage.from('punch-photos').createSignedUrl(path, 120); return error?null:data.signedUrl; },
     subscribe(tables,onChange,onStatus){ if(!enabled) return null; const ch=sb.channel('tk-live'); tables.forEach(t=>ch.on('postgres_changes',{event:'*',schema:'public',table:t},onChange)); ch.subscribe(onStatus); return ch; },
     removeChannel(ch){ if(enabled && ch) sb.removeChannel(ch); },
   };
@@ -1839,7 +1842,13 @@ function daySegments(punches){
   return segs;
 }
 function segKey(inId,L){return `${inId}|${L}`;}
-function segApproved(inId,L){return !!DB.segApprovals[segKey(inId,L)];}
+// punch photos captured by on-site tablets (stored in the punch-photos bucket)
+function punchPhoto(inId){ const p=DB.punches.find(x=>x.id===inId); return (p&&p.photoUrl)?p.photoUrl:null; }
+function photoCell(inId){ const ph=punchPhoto(inId);
+  return ph ? `<button class="phbtn" title="View punch photo" onclick="openPunchPhoto('${inId}')"><i class="ti ti-camera-filled"></i></button>`
+            : '<i class="ti ti-camera" title="No photo"></i>'; }
+async function openPunchPhoto(inId){ const ph=punchPhoto(inId); if(!ph){ toast('No photo'); return; }
+  const url=await Store.signedPhoto(ph); if(url) window.open(url,'_blank'); else toast('Could not open photo'); }function segApproved(inId,L){return !!DB.segApprovals[segKey(inId,L)];}
 function canToggleLayer(L,empId){ const u=me();
   if(u.role==='hr') return true;
   if(u.role==='manager' && L==='M' && u.manages?.includes(empId)) return true;
@@ -2260,7 +2269,7 @@ function renderPeriodTimecard(empId, start, stop, viewerLayer){
         <td><button class="notebtn ${note?'has':''}" onclick="openSegNote('${s.inId}','${empId}')" title="${note?note.replace(/"/g,'&quot;'):'Add note'}"><i class="ti ti-message-2"></i></button></td>
         <td class="edcol">${s.manual?'<b>Y</b>':''}</td>
         <td class="brk">${bl}</td>
-        <td class="phcol"><i class="ti ti-camera" title="No photo"></i></td>
+        <td class="phcol">${photoCell(s.inId)}</td>
         <td class="tin ${editable?'editcell':''}" ${editable?`onclick="openPunch('${empId}','${d.weekKey}','${s.inId}')" title="Edit this punch"`:''}>${inCell}</td>
         <td class="${editable&&s.outId?'editcell':''}" ${editable&&s.outId?`onclick="openPunch('${empId}','${d.weekKey}','${s.outId}')" title="Edit this punch"`:''}>${outCell}</td>
         <td class="num">${s.out?h2(s.hrs):'—'}</td>

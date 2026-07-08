@@ -755,8 +755,10 @@ const Store = (() => {
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc,punchLocations };
     },
-    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name'};
+    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name',ptoUsed:'pto_used',sickUsed:'sick_used'};
       const row={}; Object.keys(patch).forEach(k=>row[m[k]||k]=patch[k]); return sb.from('employees').update(row).eq('id',id); },
+    // publish the tenure-computed PTO/sick accrued into the columns the web-clock kiosk reads (used hours stay owned by HR Hub)
+    publishBalances(id, ptoAllot, sickAllot){ return enabled ? sb.from('employees').update({pto_allot:ptoAllot, sick_allot:sickAllot}).eq('id',id) : null; },
     addPunch(p){ return enabled ? sb.from('punches').insert({id:p.id,employee_id:p.emp,ts:p.ts,type:p.type,source:p.source||'manual',edited_by:p.editedBy}) : null; },
     editPunch(p){ return enabled ? sb.from('punches').update({ts:p.ts,type:p.type,source:'manual',edited_by:p.editedBy}).eq('id',p.id) : null; },
     removePunch(id){ return enabled ? sb.from('punches').delete().eq('id',id) : null; },
@@ -803,7 +805,7 @@ const Store = (() => {
     'decidePunchRequest','decidePtoRequest','deletePtoRequest','addLeave','removeLeave','addOccurrence','removeOccurrence',
     'addPremium','removePremium','addHoliday','removeHoliday','saveSchedule','removeSchedule',
     'saveRecurring','removeRecurring','setExcused','ackAlert','audit','savePayrollBatch','reopenBatch',
-    'saveReportConfig','removeReportConfig','saveLocation','removeLocation'];
+    'saveReportConfig','removeReportConfig','saveLocation','removeLocation','publishBalances'];
   writes.forEach(name=>{ const orig=Store[name]; if(typeof orig!=='function') return;
     Store[name]=function(...args){ const b=orig.apply(Store,args);
       if(b && typeof b.then==='function'){
@@ -3308,6 +3310,25 @@ function ptoH(h){ if(h==null) return '—'; const r=Math.round(h*10)/10; return 
 function ptoHd(h){ const hpd=ptoHPD(); const d=h/hpd; const r=Math.round(d*10)/10; return (Number.isInteger(r)?r:r.toFixed(1))+'d'; }
 
 // --- Hours-detail: Accruals tab (tenure-based PTO / Sick per policy §7.5) ---
+// Publish each employee's tenure-computed PTO/sick accrued into the columns the web-clock kiosk reads,
+// so employees see the same balances there. Used hours stay owned by HR Hub; only "allot" is written.
+function syncBalancesToKiosk(){
+  if(me().role!=='hr'){ toast('HR only'); return; }
+  const list=DB.employees.filter(x=>x.role==='employee' && x.hireDate);
+  let n=0;
+  list.forEach(e=>{
+    const pUse=e.pto?.used||0, sUse=e.sick?.used||0;
+    const c=ptoCompute({hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
+      leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed:pUse, sickUsed:sUse}, todayYmd(e));
+    const ptoAllot=Math.round(((c.eligible?c.ptoAvailable:0)+pUse)*100)/100;   // allot so that (allot − used) = the tenure available
+    const sickAllot=Math.round((c.sickAvailable+sUse)*100)/100;
+    if((e.pto?.allot||0)!==ptoAllot || (e.sick?.allot||0)!==sickAllot){
+      e.pto={...(e.pto||{}), allot:ptoAllot}; e.sick={...(e.sick||{}), allot:sickAllot};
+      chk(Store.publishBalances(e.id, ptoAllot, sickAllot),'Balances'); n++;
+    }
+  });
+  toast(n?`Synced ${n} balance${n===1?'':'s'} to the kiosk`:'Kiosk balances already up to date'); render();
+}
 function accrualsTab(empId, start, stop){
   const e=emp(empId);
   const com=committedLeave(empId);
@@ -3362,7 +3383,7 @@ function accrualsTab(empId, start, stop){
     <div class="reqbanner info"><div class="reqrow"><i class="ti ti-user-heart"></i>
       <div><b>Tenure-based accrual · ${typeLabel}</b>
       <div class="reqmeta">Service date <b>${ptoFmt(c.asd)}</b>${e.rehire?' <span class="src">bridged</span>':''} · <b>${tenureStr}</b> of service · PTO ${ninety} · ${capStr}${c.warnings.length?` · <span style="color:var(--warn)">${c.warnings[0]}</span>`:''}</div></div>
-      ${me().role==='hr'?`<button class="btn ghost sm" onclick="openAccrEdit('${empId}')"><i class="ti ti-pencil"></i> Edit</button>`:''}</div></div>
+      ${me().role==='hr'?`<button class="btn ghost sm" onclick="syncBalancesToKiosk()"><i class="ti ti-refresh"></i> Sync to kiosk</button> <button class="btn ghost sm" onclick="openAccrEdit('${empId}')"><i class="ti ti-pencil"></i> Edit</button>`:''}</div></div>
     <table class="wtable"><thead><tr><th>Type</th><th class="num">Allotted</th><th class="num">Used YTD</th><th class="num">Committed</th><th class="num">Available</th></tr></thead>
     <tbody>
       ${row('PTO','ti-beach',ptoAll,pUse,pCom,ptoAvail,'pto')}
@@ -3429,7 +3450,8 @@ function openAccrEdit(empId){
   EDIT=null;REQ=null;SEDIT=null;LEDIT=null;OEDIT=null;PEDIT=null;HEDIT=null;NEDIT=null;LNOTE=null;PUNCH=null;PAYVIEW=null;ACCR=null;TODETAIL=null;LOCEDIT=null;PINSET=null;
   const e=emp(empId);
   ACCRED={ empId, hireDate:e.hireDate||'', leadership:!!e.leadership, ptoEligible:e.ptoEligible!==false,
-           rehire:!!e.rehire, priorSepDate:e.priorSepDate||'', rehireDate:e.rehireDate||'' };
+           rehire:!!e.rehire, priorSepDate:e.priorSepDate||'', rehireDate:e.rehireDate||'',
+           ptoUsed:e.pto?.used||0, sickUsed:e.sick?.used||0 };
   render();
 }
 function closeAccrEdit(){ ACCRED=null; render(); }
@@ -3437,11 +3459,21 @@ function accrEdSet(k,v){ ACCRED[k]=v; renderAccrEditModal(); }
 function saveAccrEdit(){
   const d=ACCRED; if(!d.hireDate){ toast('Hire date is required'); return; }
   const e=emp(d.empId);
+  const ptoUsed=Math.max(0,+d.ptoUsed||0), sickUsed=Math.max(0,+d.sickUsed||0);
+  const priorSepDate=d.rehire?(d.priorSepDate||null):null, rehireDate=d.rehire?(d.rehireDate||null):null;
   const patch={ hireDate:d.hireDate, leadership:!!d.leadership, ptoEligible:!!d.ptoEligible,
-    rehire:!!d.rehire, priorSepDate:d.rehire?(d.priorSepDate||null):null, rehireDate:d.rehire?(d.rehireDate||null):null };
-  Object.assign(e, patch);
+    rehire:!!d.rehire, priorSepDate, rehireDate, ptoUsed, sickUsed };
+  Object.assign(e, { hireDate:d.hireDate, leadership:!!d.leadership, ptoEligible:!!d.ptoEligible, rehire:!!d.rehire, priorSepDate, rehireDate });
+  e.pto={...(e.pto||{}), used:ptoUsed}; e.sick={...(e.sick||{}), used:sickUsed};
   chk(Store.updateEmployee(e.id, patch),'Employee');
-  ACCRED=null; toast('Accrual profile saved'); render();
+  // recompute this employee's tenure balance and push it to the kiosk so the edit flows through right away
+  const c=ptoCompute({hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
+    leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed, sickUsed}, todayYmd(e));
+  const ptoAllot=Math.round(((c.eligible?c.ptoAvailable:0)+ptoUsed)*100)/100;
+  const sickAllot=Math.round((c.sickAvailable+sickUsed)*100)/100;
+  e.pto.allot=ptoAllot; e.sick.allot=sickAllot;
+  chk(Store.publishBalances(e.id, ptoAllot, sickAllot),'Balances');
+  ACCRED=null; toast('Balances saved & pushed to kiosk'); render();
 }
 function renderAccrEditModal(){
   const host=document.getElementById('modal'); if(!ACCRED){ host.innerHTML=''; host.classList.remove('show'); return; }
@@ -3465,6 +3497,11 @@ function renderAccrEditModal(){
         <div class="field" style="flex:1"><label>Prior separation date</label><input type="date" value="${d.priorSepDate}" onchange="accrEdSet('priorSepDate',this.value)"></div>
         <div class="field" style="flex:1"><label>Rehire (current start) date</label><input type="date" value="${d.rehireDate}" onchange="accrEdSet('rehireDate',this.value)"></div>
       </div><div class="hint" style="margin-top:6px">Hire date above = <b>original</b> hire; tenure counts prior service up to the separation, then resumes at rehire.</div>`:''}
+      <div style="display:flex;gap:12px;margin-top:16px;border-top:1px solid var(--line);padding-top:14px">
+        <div class="field" style="flex:1"><label>PTO used YTD (hrs)</label><input type="number" step="0.25" min="0" value="${d.ptoUsed}" onchange="accrEdSet('ptoUsed',+this.value)"></div>
+        <div class="field" style="flex:1"><label>Sick used YTD (hrs)</label><input type="number" step="0.25" min="0" value="${d.sickUsed}" onchange="accrEdSet('sickUsed',+this.value)"></div>
+      </div>
+      <div class="notewarn"><i class="ti ti-info-circle"></i> Used hours normally sync from the HR Hub. Editing them here overrides that value and pushes the new balance to the kiosk — but the HR Hub could overwrite it on its next sync, so set the HR Hub as the single source if you plan to manage balances here.</div>
     </div>
     <div class="modalfoot"><button class="btn ghost" onclick="closeAccrEdit()">Cancel</button>
       <button class="btn primary" onclick="saveAccrEdit()"><i class="ti ti-check"></i> Save</button></div></div>`;

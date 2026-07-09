@@ -646,6 +646,7 @@ tr:last-child td{border-bottom:none}
 .subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--warn);color:#fff;font-size:11px;font-weight:800}
 .execpill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:6px;vertical-align:middle;margin-left:4px}
 .tchip-mgr{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#1d4ed8;background:#dbe7fc;padding:1px 5px;border-radius:5px;margin-left:4px}
+.balcell{width:74px;text-align:right}
 .viewas-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fef3c7;border:1px solid #fcd34d;color:#92600a;border-radius:11px;padding:11px 16px;margin-bottom:16px;font-size:13.5px;font-weight:600}
 .scopetgl{display:inline-flex;background:#eef1f7;padding:3px;border-radius:9px;gap:3px;margin-right:8px}
 .scopetgl button{padding:6px 12px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--muted);background:none;white-space:nowrap}
@@ -3358,6 +3359,17 @@ function pushBalance(e){                                   // recompute + publis
   e.pto={...(e.pto||{}), allot:b.ptoAllot}; e.sick={...(e.sick||{}), allot:b.sickAllot};
   chk(Store.publishBalances(e.id, b.ptoAllot, b.sickAllot),'Balances'); return true;
 }
+// set an available balance directly: back-calculate used from the tenure bank (avail = bank − used)
+function setBalance(id, kind, val){
+  const e=emp(id); const b=computeBalance(e);
+  if(!b){ toast('Set a hire date first'); render(); return; }
+  const newAvail=Math.max(0, Math.round((+val||0)*100)/100);
+  const bank = kind==='pto' ? b.ptoAllot : b.sickAllot;   // accrued bank = current avail + used
+  const newUsed = Math.max(0, Math.round((bank - newAvail)*100)/100);   // can't exceed the accrued bank
+  if(kind==='pto'){ e.pto={...(e.pto||{}), used:newUsed}; chk(Store.updateEmployee(id,{ptoUsed:newUsed}),'PTO'); }
+  else { e.sick={...(e.sick||{}), used:newUsed}; chk(Store.updateEmployee(id,{sickUsed:newUsed}),'Sick'); }
+  pushBalance(e); toast('Balance updated · pushed to kiosk'); render();
+}
 function syncBalancesToKiosk(){
   if(me().role!=='hr'){ toast('HR only'); return; }
   let n=0; DB.employees.filter(x=>x.role==='employee' && x.hireDate).forEach(e=>{ if(pushBalance(e)) n++; });
@@ -4728,13 +4740,13 @@ function tenureSection(){
       <td><input class="cell-in" type="date" style="width:150px" value="${e.hireDate||''}" onchange="setField('${e.id}','hireDate',this.value)"></td>
       <td style="text-align:center"><button class="toggle ${e.leadership?'on':''}" onclick="setField('${e.id}','leadership',${e.leadership?'false':'true'})" title="${e.leadership?'Leadership / salaried accrual chart':'Hourly (standard chart)'}"><span></span></button></td>
       <td style="text-align:center"><button class="toggle ${e.ptoEligible!==false?'on':''}" onclick="setField('${e.id}','ptoEligible',${e.ptoEligible!==false?'false':'true'})" title="${e.ptoEligible!==false?'PTO-eligible (30+ hrs/wk)':'Not PTO-eligible (part-time)'}"><span></span></button></td>
-      <td class="num">${b?h2(b.ptoAvail):'<span class="hint">—</span>'}</td>
-      <td class="num">${b?h2(b.sickAvail):'<span class="hint">—</span>'}</td>
+      <td class="num">${b?`<input class="cell-in balcell" type="number" step="0.25" min="0" value="${b.ptoAvail}" onchange="setBalance('${e.id}','pto',this.value)" title="PTO available (hrs) — editable">`:'<span class="hint">—</span>'}</td>
+      <td class="num">${b?`<input class="cell-in balcell" type="number" step="0.25" min="0" value="${b.sickAvail}" onchange="setBalance('${e.id}','sick',this.value)" title="Sick available (hrs) — editable">`:'<span class="hint">—</span>'}</td>
     </tr>`; }).join('');
   const noHire=rows.filter(e=>!e.hireDate).length;
   return `<div class="card">
     <h2><i class="ti ti-calendar-stats"></i> Tenure &amp; Accruals <span class="cbadge" style="background:var(--muted)">${rows.length}</span></h2>
-    <p class="hint" style="margin-bottom:12px">Everyone who accrues PTO/sick — employees, managers, and HR. Set hire date, leadership status, and PTO eligibility; anniversary tiers apply automatically from the hire date. Balances update live and push to the kiosk. ${noHire?`<b style="color:var(--warn)">${noHire}</b> still need a hire date.`:''}</p>
+    <p class="hint" style="margin-bottom:12px">Everyone who accrues PTO/sick — employees, managers, and HR. Set hire date, leadership status, and PTO eligibility; anniversary tiers apply automatically from the hire date. <b>PTO/Sick available are editable</b> — type a new balance (in hours) to adjust it. Balances update live and push to the kiosk. ${noHire?`<b style="color:var(--warn)">${noHire}</b> still need a hire date.`:''}</p>
     <div class="rosttools">
       <button class="btn sm" onclick="document.getElementById('balImport').click()"><i class="ti ti-upload"></i> Import balances (CSV)</button>
       <button class="btn sm" onclick="downloadBalTemplate()"><i class="ti ti-file-download"></i> Download current (CSV)</button>

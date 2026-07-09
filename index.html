@@ -643,6 +643,11 @@ tr:last-child td{border-bottom:none}
 .subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
 .subtab{background:none;padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
 .subtab.on{color:var(--navy);border-bottom-color:var(--tab-acc,var(--accent))}
+.subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--warn);color:#fff;font-size:11px;font-weight:800}
+.execpill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:6px;vertical-align:middle;margin-left:4px}
+.tchip-mgr{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#1d4ed8;background:#dbe7fc;padding:1px 5px;border-radius:5px;margin-left:4px}
+.mgr-exec{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.mgr-exec i{margin-right:4px}
 .wk-toggle{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
 .wk-toggle input{width:16px;height:16px;accent-color:var(--accent)}
 
@@ -756,7 +761,7 @@ const Store = (() => {
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc,punchLocations };
     },
-    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name',ptoUsed:'pto_used',sickUsed:'sick_used'};
+    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name',ptoUsed:'pto_used',sickUsed:'sick_used',viewAll:'view_all'};
       const row={}; Object.keys(patch).forEach(k=>row[m[k]||k]=patch[k]); return sb.from('employees').update(row).eq('id',id); },
     // publish the tenure-computed PTO/sick accrued into the columns the web-clock kiosk reads (used hours stay owned by HR Hub)
     publishBalances(id, ptoAllot, sickAllot){ return enabled ? sb.from('employees').update({pto_allot:ptoAllot, sick_allot:sickAllot}).eq('id',id) : null; },
@@ -4552,6 +4557,8 @@ function hrRow(e){
   </tr>`;
 }
 
+let EMPTAB='roster';
+function empTab(t){ EMPTAB=t; render(); }
 function viewEmployee(){
   const managers = DB.employees.filter(e=>e.role!=='employee');
   const emps = DB.employees.filter(e=>e.role==='employee').sort((a,b)=>a.name.localeCompare(b.name));
@@ -4582,53 +4589,65 @@ function viewEmployee(){
     </div>`;
   }).join('');
 
-  // ----- Manager access: each manager shows only their own team -----
+  // ----- Manager access: full reporting hierarchy (people report to managers, managers to managers/execs) -----
   const mgrCards = DB.employees.filter(e=>e.role==='manager').sort((a,b)=>a.name.localeCompare(b.name));
-  const validMgrIds = new Set(managers.map(m=>m.id));
-  const unassigned = emps.filter(e=>!e.mgr || !validMgrIds.has(e.mgr));
+  const validMgrIds = new Set(managers.map(m=>m.id));               // managers + HR = valid supervisors
+  const people = DB.employees.filter(e=>e.role==='employee' || e.role==='manager');   // everyone placeable in the org
+  const isExec = e => e.role==='manager' && e.viewAll;              // CEO/COO — top of the org, no supervisor needed
+  const unassigned = people.filter(e=>!isExec(e) && (!e.mgr || !validMgrIds.has(e.mgr)));
   const mgrName = id => (emp(id)||{}).name || '';
 
   const mgrCardsHtml = mgrCards.map(m=>{
-    const team = emps.filter(e=>e.mgr===m.id).sort((a,b)=>a.name.localeCompare(b.name));
-    const options = emps.filter(e=>e.mgr!==m.id).sort((a,b)=>a.name.localeCompare(b.name))
-      .map(e=>`<option value="${e.id}">${esc(e.name)}${e.mgr&&validMgrIds.has(e.mgr)?` — now under ${esc(mgrName(e.mgr))}`:''}</option>`).join('');
+    const anc = ancestorsOf(m.id);                                  // m's own supervisor chain — excluded to prevent loops
+    const team = people.filter(e=>e.mgr===m.id).sort((a,b)=>a.name.localeCompare(b.name));
+    const options = people.filter(e=> e.id!==m.id && e.mgr!==m.id && !anc.has(e.id))
+      .sort((a,b)=>a.name.localeCompare(b.name))
+      .map(e=>`<option value="${e.id}">${esc(e.name)}${e.role==='manager'?' · mgr':''}${e.mgr&&validMgrIds.has(e.mgr)?` — now under ${esc(mgrName(e.mgr))}`:''}</option>`).join('');
     return `<div class="mgrcard">
       <div class="mgrcard-top">
         <div class="mgr-av">${initials(m.name)||'<i class="ti ti-user"></i>'}</div>
-        <div class="mgr-id"><div class="nm">${esc(m.name)}</div><div class="sb">${m.loc||''}${m.tz?' · '+TZ[m.tz]:''}</div></div>
+        <div class="mgr-id"><div class="nm">${esc(m.name)}${isExec(m)?' <span class="execpill">Exec</span>':''}</div><div class="sb">${m.loc||''}${m.tz?' · '+TZ[m.tz]:''}${m.mgr&&validMgrIds.has(m.mgr)?' · under '+esc(mgrName(m.mgr)):''}</div></div>
         <div class="mgr-count">${team.length} ${team.length===1?'report':'reports'}</div>
+        <button class="btn ghost sm" title="Move ${esc(m.name)} back to employee" onclick="demoteToEmployee('${m.id}')"><i class="ti ti-user-down"></i></button>
       </div>
       ${team.length?`<div class="teamchips">${team.map(e=>`
-        <span class="tchip">${esc(e.name)}<button class="x" title="Remove from ${esc(m.name)}'s team" onclick="removeReport('${e.id}')"><i class="ti ti-x"></i></button></span>`).join('')}</div>`
+        <span class="tchip">${esc(e.name)}${e.role==='manager'?' <span class="tchip-mgr">mgr</span>':''}<button class="x" title="Remove from ${esc(m.name)}'s team" onclick="removeReport('${e.id}')"><i class="ti ti-x"></i></button></span>`).join('')}</div>`
         :`<div class="teamempty">No one assigned yet.</div>`}
       <div class="assignsel">
         <select onchange="if(this.value){assignReport('${m.id}',this.value)}">
-          <option value="">+ Assign an employee…</option>
+          <option value="">+ Assign a person…</option>
           ${options}
         </select>
       </div>
+      <label class="mgr-exec" title="Exec — can view and approve every employee, not just their own team">
+        <span><i class="ti ti-eye"></i> View all (exec)</span>
+        <button class="toggle ${isExec(m)?'on':''}" onclick="setField('${m.id}','viewAll',${isExec(m)?'false':'true'})"><span></span></button>
+      </label>
     </div>`;
   }).join('');
 
   const unassignedHtml = unassigned.length ? `<div class="unassigned-card">
-    <h3><i class="ti ti-alert-triangle"></i> Unassigned — no manager yet (${unassigned.length})</h3>
-    <p class="hint" style="margin-bottom:8px">These employees won't appear on any manager's timecard queue until they're assigned.</p>
-    ${unassigned.sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`
-      <div class="unassigned-row">
-        <span class="nm">${esc(e.name)}</span>
+    <h3><i class="ti ti-alert-triangle"></i> No supervisor yet (${unassigned.length})</h3>
+    <p class="hint" style="margin-bottom:8px">Not placed under anyone. Employees won't appear on a manager's approval queue; managers won't roll up to anyone above them.</p>
+    ${unassigned.sort((a,b)=>a.name.localeCompare(b.name)).map(e=>{
+      const sup = mgrCards.filter(m=>m.id!==e.id && !ancestorsOf(m.id).has(e.id));   // valid supervisors (no loops)
+      return `<div class="unassigned-row">
+        <span class="nm">${esc(e.name)}${e.role==='manager'?' <span class="tchip-mgr">mgr</span>':''}</span>
         <span class="hint" style="margin:0">${e.dept?esc(e.dept)+' · ':''}${e.loc||''}</span>
-        <select style="margin-left:auto" onchange="if(this.value){assignReport(this.value,'${e.id}')}">
-          <option value="">Assign to manager…</option>
-          ${mgrCards.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}
-        </select>
-      </div>`).join('')}
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${e.role==='employee'?`<button class="btn sm" title="Promote ${esc(e.name)} to manager" onclick="promoteToManager('${e.id}')"><i class="ti ti-user-up"></i> Make manager</button>`:''}
+          <select onchange="if(this.value){assignReport(this.value,'${e.id}')}">
+            <option value="">Assign under…</option>
+            ${sup.map(m=>`<option value="${m.id}">${esc(m.name)}${isExec(m)?' (exec)':''}</option>`).join('')}
+          </select>
+        </div>
+      </div>`;
+    }).join('')}
   </div>` : '';
 
-  return `<div class="pagehead"><div><h1>Employee</h1><p>Profiles, timezones, pay rules, and manager access.</p></div></div>
+  const tab = EMPTAB||'roster';
 
-  <datalist id="deptOptions">${deptOpts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
-
-  <div class="card">
+  const rosterCard = `<div class="card">
     <h2><i class="ti ti-users"></i> Roster <span class="cbadge" style="background:var(--muted)">${emps.length}</span></h2>
     <div class="rosttools">
       <button class="btn sm" onclick="expandAllDepts(true)"><i class="ti ti-chevrons-down"></i> Expand all</button>
@@ -4637,24 +4656,36 @@ function viewEmployee(){
     </div>
     ${groups}
     <div class="hint" style="margin-top:12px">Click a department to expand and edit its employees. Changes save immediately. <b>Dept</b> is now a dropdown — click it to pick an existing department, or just type a new name to <b>create a new department</b> (it appears as its own group). <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch.</div>
-  </div>
+  </div>`;
 
-  ${tenureSection()}
-
-  <div class="card">
+  const hrCard = `<div class="card">
     <h2><i class="ti ti-shield-check"></i> HR &amp; Administrators <span class="cbadge" style="background:var(--muted)">${hrUsers.length}</span></h2>
     <p class="hint" style="margin-bottom:12px">Full access — these users view and approve every timecard, so they're kept out of the roster count and off any manager's team. Edit their details here.</p>
     <div style="overflow-x:auto"><table class="roster" style="min-width:840px">${ROSTER_HEAD}<tbody>
       ${hrUsers.map(e=>hrRow(e)).join('') || '<tr><td colspan="9" class="teamempty" style="padding:12px 4px">No HR users set up yet.</td></tr>'}
     </tbody></table></div>
-  </div>
+  </div>`;
 
-  <div class="card">
+  const accessCard = `<div class="card">
     <h2><i class="ti ti-user-shield"></i> Manager Access</h2>
     <p class="hint" style="margin-bottom:14px">Each manager can view and approve timecards for the team shown on their card. Remove someone with the ✕, or assign a new report with the dropdown.</p>
     ${unassignedHtml}
     <div class="mgrgrid">${mgrCardsHtml || '<div class="teamempty">No managers set up yet.</div>'}</div>
   </div>`;
+
+  const subtabs=[
+    {id:'roster', label:'Roster', icon:'ti-users'},
+    {id:'tenure', label:'Tenure & Accruals', icon:'ti-calendar-stats'},
+    {id:'hr',     label:'HR & Admins', icon:'ti-shield-check'},
+    {id:'access', label:'Manager Access', icon:'ti-user-shield', badge:unassigned.length}
+  ];
+  const bar=`<div class="subtabs">${subtabs.map(t=>`<button class="subtab ${tab===t.id?'on':''}" onclick="empTab('${t.id}')"><i class="ti ${t.icon}"></i> ${t.label}${t.badge?`<span class="subtab-badge">${t.badge}</span>`:''}</button>`).join('')}</div>`;
+  const section = tab==='tenure'?tenureSection() : tab==='hr'?hrCard : tab==='access'?accessCard : rosterCard;
+
+  return `<div class="pagehead"><div><h1>Employee</h1><p>Profiles, timezones, pay rules, and manager access.</p></div></div>
+  <datalist id="deptOptions">${deptOpts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+  ${bar}
+  ${section}`;
 }
 // ----- Tenure & Accruals: roster-wide hire date / leadership / eligibility + live balances -----
 function tenureSection(){
@@ -4764,6 +4795,9 @@ function rebuildManages(){
     m.manages = DB.employees.filter(e=>e.mgr===m.id).map(e=>e.id);
   });
 }
+// walk the supervisor chain upward from an id (used to prevent reporting loops)
+function ancestorsOf(id){ const set=new Set(); let cur=emp(id), g=0;
+  while(cur && cur.mgr && g++<50){ if(set.has(cur.mgr)) break; set.add(cur.mgr); cur=emp(cur.mgr); } return set; }
 // Manager Access: assign an employee to a manager (moves them off any prior manager).
 function assignReport(mgrId, empId){
   const e = emp(empId); if(!e) return;
@@ -4775,6 +4809,22 @@ function removeReport(empId){
   const e = emp(empId); if(!e) return;
   e.mgr = null; Store.updateEmployee(empId,{mgr:null});
   rebuildManages(); toast('Removed'); render();
+}
+// Manager Access: promote an employee to manager so others can report to them.
+function promoteToManager(id){
+  const e=emp(id); if(!e || e.role==='manager') return;
+  e.role='manager';
+  chk(Store.updateEmployee(id,{role:'manager'}),'Role');
+  rebuildManages(); toast(`${e.name} is now a manager`); render();
+}
+// Manager Access: move a manager back to employee (only if they have no reports).
+function demoteToEmployee(id){
+  const e=emp(id); if(!e) return;
+  const reports=DB.employees.filter(x=>x.mgr===id);
+  if(reports.length){ toast(`Reassign ${e.name}'s ${reports.length} report${reports.length===1?'':'s'} first`); return; }
+  e.role='employee';
+  chk(Store.updateEmployee(id,{role:'employee'}),'Role');
+  rebuildManages(); toast(`${e.name} moved back to employee`); render();
 }
 
 /* ---------- toast ---------- */

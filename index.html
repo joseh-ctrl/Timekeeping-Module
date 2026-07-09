@@ -4639,7 +4639,7 @@ function viewEmployee(){
     <div class="hint" style="margin-top:12px">Click a department to expand and edit its employees. Changes save immediately. <b>Dept</b> is now a dropdown — click it to pick an existing department, or just type a new name to <b>create a new department</b> (it appears as its own group). <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch.</div>
   </div>
 
-  ${tenureSection(emps)}
+  ${tenureSection()}
 
   <div class="card">
     <h2><i class="ti ti-shield-check"></i> HR &amp; Administrators <span class="cbadge" style="background:var(--muted)">${hrUsers.length}</span></h2>
@@ -4657,11 +4657,12 @@ function viewEmployee(){
   </div>`;
 }
 // ----- Tenure & Accruals: roster-wide hire date / leadership / eligibility + live balances -----
-function tenureSection(emps){
-  const rows=emps.slice().sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name));
+function tenureSection(){
+  const rows=DB.employees.slice().sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name));
+  const roleTag=e=>e.role==='hr'?'<span class="hint"> · HR</span>':e.role==='manager'?'<span class="hint"> · Mgr</span>':'';
   const body=rows.map(e=>{ const b=computeBalance(e);
     return `<tr>
-      <td><div class="who">${esc(e.name)}</div><div class="hint" style="margin:0">ID ${esc(e.empId||'')}</div></td>
+      <td><div class="who">${esc(e.name)}${roleTag(e)}</div><div class="hint" style="margin:0">ID ${esc(e.empId||'')}</div></td>
       <td>${e.dept?esc(e.dept):'<span class="hint">—</span>'}</td>
       <td><input class="cell-in" type="date" style="width:150px" value="${e.hireDate||''}" onchange="setField('${e.id}','hireDate',this.value)"></td>
       <td style="text-align:center"><button class="toggle ${e.leadership?'on':''}" onclick="setField('${e.id}','leadership',${e.leadership?'false':'true'})" title="${e.leadership?'Leadership / salaried accrual chart':'Hourly (standard chart)'}"><span></span></button></td>
@@ -4669,27 +4670,27 @@ function tenureSection(emps){
       <td class="num">${b?h2(b.ptoAvail):'<span class="hint">—</span>'}</td>
       <td class="num">${b?h2(b.sickAvail):'<span class="hint">—</span>'}</td>
     </tr>`; }).join('');
-  const noHire=emps.filter(e=>!e.hireDate).length;
+  const noHire=rows.filter(e=>!e.hireDate).length;
   return `<div class="card">
-    <h2><i class="ti ti-calendar-stats"></i> Tenure &amp; Accruals <span class="cbadge" style="background:var(--muted)">${emps.length}</span></h2>
-    <p class="hint" style="margin-bottom:12px">Set hire date, leadership status, and PTO eligibility — anniversary tiers are applied automatically from the hire date. Available balances update live and push to the kiosk. ${noHire?`<b style="color:var(--warn)">${noHire}</b> still need a hire date.`:''}</p>
+    <h2><i class="ti ti-calendar-stats"></i> Tenure &amp; Accruals <span class="cbadge" style="background:var(--muted)">${rows.length}</span></h2>
+    <p class="hint" style="margin-bottom:12px">Everyone who accrues PTO/sick — employees, managers, and HR. Set hire date, leadership status, and PTO eligibility; anniversary tiers apply automatically from the hire date. Balances update live and push to the kiosk. ${noHire?`<b style="color:var(--warn)">${noHire}</b> still need a hire date.`:''}</p>
     <div class="rosttools">
       <button class="btn sm" onclick="document.getElementById('balImport').click()"><i class="ti ti-upload"></i> Import balances (CSV)</button>
-      <button class="btn sm" onclick="downloadBalTemplate()"><i class="ti ti-file-download"></i> Download template</button>
+      <button class="btn sm" onclick="downloadBalTemplate()"><i class="ti ti-file-download"></i> Download current (CSV)</button>
       <button class="btn sm" onclick="syncBalancesToKiosk()"><i class="ti ti-refresh"></i> Sync all to kiosk</button>
       <input type="file" id="balImport" accept=".csv,text/csv" style="display:none" onchange="onBalFile(event)">
     </div>
     <div style="overflow-x:auto"><table class="roster" style="min-width:720px">
       <thead><tr><th>Employee</th><th>Dept</th><th>Hire date</th><th style="text-align:center">Leadership</th><th style="text-align:center">PTO-elig</th><th class="num">PTO avail</th><th class="num">Sick avail</th></tr></thead>
       <tbody>${body}</tbody></table></div>
-    <div class="hint" style="margin-top:10px">CSV columns (header row, any order): <b>emp_id</b> (required to match), and any of <b>pto_used</b>, <b>sick_used</b>, <b>hire_date</b> (YYYY-MM-DD), <b>leadership</b> (yes/no), <b>pto_eligible</b> (yes/no). Only the columns you include are changed. You'll see a preview before anything saves.</div>
+    <div class="hint" style="margin-top:10px"><b>Download current</b> gives you every person pre-filled with today's values — edit the cells that change and re-upload. Matching is by <b>emp_id</b> (the <b>name</b> column is just for your reference). Columns you leave out or blank are left unchanged. You'll always see a preview before anything saves.</div>
   </div>`;
 }
 function downloadBalTemplate(){
-  const head='emp_id,pto_used,sick_used,hire_date,leadership,pto_eligible';
-  const sample=DB.employees.filter(e=>e.role==='employee').slice(0,3)
-    .map(e=>`${e.empId||''},${e.pto?.used||0},${e.sick?.used||0},${e.hireDate||''},${e.leadership?'yes':'no'},${e.ptoEligible!==false?'yes':'no'}`);
-  dlFile('balance_import_template.csv', [head,...sample].join('\n'), 'text/csv');
+  const head='emp_id,name,pto_used,sick_used,hire_date,leadership,pto_eligible';
+  const rows=DB.employees.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(e=>
+    [e.empId||'', csvCell(e.name), e.pto?.used||0, e.sick?.used||0, e.hireDate||'', e.leadership?'yes':'no', e.ptoEligible!==false?'yes':'no'].join(','));
+  dlFile('balance_import_template.csv', [head,...rows].join('\n'), 'text/csv');
 }
 // --- CSV parsing (quote-aware) ---
 function parseCSV(text){

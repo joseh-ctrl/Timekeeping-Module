@@ -526,6 +526,7 @@ tr:last-child td{border-bottom:none}
 .photoview-inner{position:relative;max-width:92vw;max-height:88vh;cursor:default}
 .photoview-inner img{max-width:92vw;max-height:88vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);display:block}
 .photoview-x{position:absolute;top:-14px;right:-14px;width:36px;height:36px;border-radius:50%;background:#fff;border:none;font-size:22px;line-height:34px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.imp-ch{font-size:12.5px;padding:2px 0} .imp-ch .imp-f{display:inline-block;min-width:74px;font-weight:700;color:var(--muted)}
 .tcard tr.tc-day td{border-top:1px solid var(--line)}
 .tcard .apcol{text-align:center;width:34px}
 .tcard th.apcol{font-size:13px;font-weight:700;color:var(--navy)}
@@ -1591,6 +1592,7 @@ function render(){
   else if(ACCR) renderAccrualModal();
   else if(ACCRED) renderAccrEditModal();
   else if(TODETAIL) renderReqDetailModal();
+  else if(IMPORT) renderImportModal();
   else { host.innerHTML=''; host.classList.remove('show'); }
 }
 
@@ -3309,24 +3311,25 @@ function ptoCompute(emp, asOfISO){
 function ptoH(h){ if(h==null) return '—'; const r=Math.round(h*10)/10; return (Number.isInteger(r)?r:r.toFixed(1))+'h'; }
 function ptoHd(h){ const hpd=ptoHPD(); const d=h/hpd; const r=Math.round(d*10)/10; return (Number.isInteger(r)?r:r.toFixed(1))+'d'; }
 
-// --- Hours-detail: Accruals tab (tenure-based PTO / Sick per policy §7.5) ---
-// Publish each employee's tenure-computed PTO/sick accrued into the columns the web-clock kiosk reads,
-// so employees see the same balances there. Used hours stay owned by HR Hub; only "allot" is written.
+// --- Accruals: compute an employee's tenure balance and publish it to the kiosk columns ---
+// Returns {pto, sick} available, or null if not eligible/no hire date. Writes only when changed.
+function computeBalance(e){
+  if(!e.hireDate) return null;
+  const pUse=e.pto?.used||0, sUse=e.sick?.used||0;
+  const c=ptoCompute({hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
+    leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed:pUse, sickUsed:sUse}, todayYmd(e));
+  const ptoAvail=Math.round((c.eligible?c.ptoAvailable:0)*100)/100, sickAvail=Math.round(c.sickAvailable*100)/100;
+  return { ptoAvail, sickAvail, ptoAllot:Math.round((ptoAvail+pUse)*100)/100, sickAllot:Math.round((sickAvail+sUse)*100)/100 };
+}
+function pushBalance(e){                                   // recompute + publish one employee's balance to the kiosk (only if changed)
+  const b=computeBalance(e); if(!b) return false;
+  if((e.pto?.allot||0)===b.ptoAllot && (e.sick?.allot||0)===b.sickAllot) return false;
+  e.pto={...(e.pto||{}), allot:b.ptoAllot}; e.sick={...(e.sick||{}), allot:b.sickAllot};
+  chk(Store.publishBalances(e.id, b.ptoAllot, b.sickAllot),'Balances'); return true;
+}
 function syncBalancesToKiosk(){
   if(me().role!=='hr'){ toast('HR only'); return; }
-  const list=DB.employees.filter(x=>x.role==='employee' && x.hireDate);
-  let n=0;
-  list.forEach(e=>{
-    const pUse=e.pto?.used||0, sUse=e.sick?.used||0;
-    const c=ptoCompute({hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
-      leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed:pUse, sickUsed:sUse}, todayYmd(e));
-    const ptoAllot=Math.round(((c.eligible?c.ptoAvailable:0)+pUse)*100)/100;   // allot so that (allot − used) = the tenure available
-    const sickAllot=Math.round((c.sickAvailable+sUse)*100)/100;
-    if((e.pto?.allot||0)!==ptoAllot || (e.sick?.allot||0)!==sickAllot){
-      e.pto={...(e.pto||{}), allot:ptoAllot}; e.sick={...(e.sick||{}), allot:sickAllot};
-      chk(Store.publishBalances(e.id, ptoAllot, sickAllot),'Balances'); n++;
-    }
-  });
+  let n=0; DB.employees.filter(x=>x.role==='employee' && x.hireDate).forEach(e=>{ if(pushBalance(e)) n++; });
   toast(n?`Synced ${n} balance${n===1?'':'s'} to the kiosk`:'Kiosk balances already up to date'); render();
 }
 function accrualsTab(empId, start, stop){
@@ -3466,13 +3469,7 @@ function saveAccrEdit(){
   Object.assign(e, { hireDate:d.hireDate, leadership:!!d.leadership, ptoEligible:!!d.ptoEligible, rehire:!!d.rehire, priorSepDate, rehireDate });
   e.pto={...(e.pto||{}), used:ptoUsed}; e.sick={...(e.sick||{}), used:sickUsed};
   chk(Store.updateEmployee(e.id, patch),'Employee');
-  // recompute this employee's tenure balance and push it to the kiosk so the edit flows through right away
-  const c=ptoCompute({hireDate:e.hireDate, rehire:e.rehire, priorSepDate:e.priorSepDate, rehireDate:e.rehireDate,
-    leadership:e.leadership, ptoEligible:e.ptoEligible, ptoUsed, sickUsed}, todayYmd(e));
-  const ptoAllot=Math.round(((c.eligible?c.ptoAvailable:0)+ptoUsed)*100)/100;
-  const sickAllot=Math.round((c.sickAvailable+sickUsed)*100)/100;
-  e.pto.allot=ptoAllot; e.sick.allot=sickAllot;
-  chk(Store.publishBalances(e.id, ptoAllot, sickAllot),'Balances');
+  pushBalance(e);                                          // recompute + push this employee's balance to the kiosk
   ACCRED=null; toast('Balances saved & pushed to kiosk'); render();
 }
 function renderAccrEditModal(){
@@ -4642,6 +4639,8 @@ function viewEmployee(){
     <div class="hint" style="margin-top:12px">Click a department to expand and edit its employees. Changes save immediately. <b>Dept</b> is now a dropdown — click it to pick an existing department, or just type a new name to <b>create a new department</b> (it appears as its own group). <b>State</b> sets meal/break law + overtime (CA daily OT + 7th-day + meal premium; PA/federal weekly). <b>Rate</b> feeds Payroll. <b>Web clock</b> ON lets a remote employee punch from the web clock; OFF means biometric-only. <b>Remote</b> ON = stays signed in on their own device; OFF = on-site terminal that signs out after each punch.</div>
   </div>
 
+  ${tenureSection(emps)}
+
   <div class="card">
     <h2><i class="ti ti-shield-check"></i> HR &amp; Administrators <span class="cbadge" style="background:var(--muted)">${hrUsers.length}</span></h2>
     <p class="hint" style="margin-bottom:12px">Full access — these users view and approve every timecard, so they're kept out of the roster count and off any manager's team. Edit their details here.</p>
@@ -4657,7 +4656,108 @@ function viewEmployee(){
     <div class="mgrgrid">${mgrCardsHtml || '<div class="teamempty">No managers set up yet.</div>'}</div>
   </div>`;
 }
-function setField(id, field, val){ if(field==='mgr' && val==='') val=null; emp(id)[field]=val; Store.updateEmployee(id,{[field]:val}); toast('Saved'); if(field==='mgr'){rebuildManages();} render(); }
+// ----- Tenure & Accruals: roster-wide hire date / leadership / eligibility + live balances -----
+function tenureSection(emps){
+  const rows=emps.slice().sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name));
+  const body=rows.map(e=>{ const b=computeBalance(e);
+    return `<tr>
+      <td><div class="who">${esc(e.name)}</div><div class="hint" style="margin:0">ID ${esc(e.empId||'')}</div></td>
+      <td>${e.dept?esc(e.dept):'<span class="hint">—</span>'}</td>
+      <td><input class="cell-in" type="date" style="width:150px" value="${e.hireDate||''}" onchange="setField('${e.id}','hireDate',this.value)"></td>
+      <td style="text-align:center"><button class="toggle ${e.leadership?'on':''}" onclick="setField('${e.id}','leadership',${e.leadership?'false':'true'})" title="${e.leadership?'Leadership / salaried accrual chart':'Hourly (standard chart)'}"><span></span></button></td>
+      <td style="text-align:center"><button class="toggle ${e.ptoEligible!==false?'on':''}" onclick="setField('${e.id}','ptoEligible',${e.ptoEligible!==false?'false':'true'})" title="${e.ptoEligible!==false?'PTO-eligible (30+ hrs/wk)':'Not PTO-eligible (part-time)'}"><span></span></button></td>
+      <td class="num">${b?h2(b.ptoAvail):'<span class="hint">—</span>'}</td>
+      <td class="num">${b?h2(b.sickAvail):'<span class="hint">—</span>'}</td>
+    </tr>`; }).join('');
+  const noHire=emps.filter(e=>!e.hireDate).length;
+  return `<div class="card">
+    <h2><i class="ti ti-calendar-stats"></i> Tenure &amp; Accruals <span class="cbadge" style="background:var(--muted)">${emps.length}</span></h2>
+    <p class="hint" style="margin-bottom:12px">Set hire date, leadership status, and PTO eligibility — anniversary tiers are applied automatically from the hire date. Available balances update live and push to the kiosk. ${noHire?`<b style="color:var(--warn)">${noHire}</b> still need a hire date.`:''}</p>
+    <div class="rosttools">
+      <button class="btn sm" onclick="document.getElementById('balImport').click()"><i class="ti ti-upload"></i> Import balances (CSV)</button>
+      <button class="btn sm" onclick="downloadBalTemplate()"><i class="ti ti-file-download"></i> Download template</button>
+      <button class="btn sm" onclick="syncBalancesToKiosk()"><i class="ti ti-refresh"></i> Sync all to kiosk</button>
+      <input type="file" id="balImport" accept=".csv,text/csv" style="display:none" onchange="onBalFile(event)">
+    </div>
+    <div style="overflow-x:auto"><table class="roster" style="min-width:720px">
+      <thead><tr><th>Employee</th><th>Dept</th><th>Hire date</th><th style="text-align:center">Leadership</th><th style="text-align:center">PTO-elig</th><th class="num">PTO avail</th><th class="num">Sick avail</th></tr></thead>
+      <tbody>${body}</tbody></table></div>
+    <div class="hint" style="margin-top:10px">CSV columns (header row, any order): <b>emp_id</b> (required to match), and any of <b>pto_used</b>, <b>sick_used</b>, <b>hire_date</b> (YYYY-MM-DD), <b>leadership</b> (yes/no), <b>pto_eligible</b> (yes/no). Only the columns you include are changed. You'll see a preview before anything saves.</div>
+  </div>`;
+}
+function downloadBalTemplate(){
+  const head='emp_id,pto_used,sick_used,hire_date,leadership,pto_eligible';
+  const sample=DB.employees.filter(e=>e.role==='employee').slice(0,3)
+    .map(e=>`${e.empId||''},${e.pto?.used||0},${e.sick?.used||0},${e.hireDate||''},${e.leadership?'yes':'no'},${e.ptoEligible!==false?'yes':'no'}`);
+  dlFile('balance_import_template.csv', [head,...sample].join('\n'), 'text/csv');
+}
+// --- CSV parsing (quote-aware) ---
+function parseCSV(text){
+  const rows=[]; let i=0, field='', row=[], inQ=false; text=text.replace(/\r\n?/g,'\n');
+  while(i<text.length){ const c=text[i];
+    if(inQ){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i+=2;continue;} inQ=false;i++; } else {field+=c;i++;} }
+    else { if(c==='"'){inQ=true;i++;} else if(c===','){row.push(field);field='';i++;} else if(c==='\n'){row.push(field);rows.push(row);row=[];field='';i++;} else {field+=c;i++;} } }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()!==''));
+}
+function csvToObjects(text){ const rows=parseCSV(text); if(!rows.length) return [];
+  const head=rows[0].map(h=>h.trim().toLowerCase().replace(/\s+/g,'_'));
+  return rows.slice(1).map(r=>{ const o={}; head.forEach((h,idx)=>o[h]=(r[idx]||'').trim()); return o; }); }
+let IMPORT=null;
+function onBalFile(ev){ const f=ev.target.files[0]; if(!f){ return; } const rd=new FileReader();
+  rd.onload=()=>{ try{ buildImportPreview(rd.result); }catch(err){ toast('Could not read that CSV'); } ev.target.value=''; };
+  rd.onerror=()=>{ toast('Could not read the file'); ev.target.value=''; }; rd.readAsText(f); }
+function buildImportPreview(text){
+  const objs=csvToObjects(text);
+  const boolOf=v=>{ v=(v||'').toString().trim().toLowerCase(); if(['yes','y','true','1','lead','leadership','salaried'].includes(v))return true; if(['no','n','false','0','hourly'].includes(v))return false; return null; };
+  const byId={}; DB.employees.forEach(e=>{ if(e.empId) byId[String(e.empId).trim()]=e; });
+  const rowsC=[], unmatched=[];
+  objs.forEach(o=>{ const key=(o.emp_id||o.id||o.employee_id||'').trim(); if(!key) return;
+    const e=byId[key]; if(!e){ unmatched.push(key); return; }
+    const ch={ id:e.id, name:e.name, empId:e.empId, changes:{} };
+    if(o.pto_used!==undefined && o.pto_used!=='') ch.changes.ptoUsed={from:e.pto?.used||0, to:Math.max(0,+o.pto_used||0)};
+    if(o.sick_used!==undefined && o.sick_used!=='') ch.changes.sickUsed={from:e.sick?.used||0, to:Math.max(0,+o.sick_used||0)};
+    if(o.hire_date) ch.changes.hireDate={from:e.hireDate||'', to:o.hire_date.trim()};
+    const lead=boolOf(o.leadership); if(lead!==null) ch.changes.leadership={from:!!e.leadership, to:lead};
+    const elig=boolOf(o.pto_eligible); if(elig!==null) ch.changes.ptoEligible={from:e.ptoEligible!==false, to:elig};
+    if(Object.keys(ch.changes).length) rowsC.push(ch);
+  });
+  IMPORT={ rows:rowsC, unmatched, total:objs.length }; render();
+}
+function closeImport(){ IMPORT=null; render(); }
+function applyImport(){
+  let n=0;
+  IMPORT.rows.forEach(rc=>{ const e=emp(rc.id); if(!e) return; const patch={}; const c=rc.changes;
+    if(c.hireDate){ e.hireDate=c.hireDate.to; patch.hireDate=c.hireDate.to; }
+    if(c.leadership){ e.leadership=c.leadership.to; patch.leadership=c.leadership.to; }
+    if(c.ptoEligible){ e.ptoEligible=c.ptoEligible.to; patch.ptoEligible=c.ptoEligible.to; }
+    if(c.ptoUsed){ e.pto={...(e.pto||{}),used:c.ptoUsed.to}; patch.ptoUsed=c.ptoUsed.to; }
+    if(c.sickUsed){ e.sick={...(e.sick||{}),used:c.sickUsed.to}; patch.sickUsed=c.sickUsed.to; }
+    if(Object.keys(patch).length){ chk(Store.updateEmployee(e.id,patch),'Import'); pushBalance(e); n++; }
+  });
+  IMPORT=null; toast(`Imported ${n} employee${n===1?'':'s'} · balances pushed to kiosk`); render();
+}
+function fmtImp(field,v){ if(field==='leadership') return v?'Leadership':'Hourly'; if(field==='ptoEligible') return v?'Eligible':'Not eligible';
+  if(field==='ptoUsed'||field==='sickUsed') return h2(+v||0); if(field==='hireDate') return v||'—'; return String(v); }
+function renderImportModal(){
+  const host=document.getElementById('modal'); if(!IMPORT) return;
+  const labels={ptoUsed:'PTO used',sickUsed:'Sick used',hireDate:'Hire date',leadership:'Type',ptoEligible:'PTO-elig'};
+  const body = IMPORT.rows.length ? IMPORT.rows.map(rc=>{
+    const chips=Object.entries(rc.changes).map(([f,c])=>`<div class="imp-ch"><span class="imp-f">${labels[f]}</span> <span class="hint">${fmtImp(f,c.from)}</span> → <b>${fmtImp(f,c.to)}</b></div>`).join('');
+    return `<tr><td><div class="who">${esc(rc.name)}</div><div class="hint" style="margin:0">ID ${esc(rc.empId||'')}</div></td><td>${chips}</td></tr>`;
+  }).join('') : `<tr><td colspan="2" class="teamempty" style="padding:16px 4px">No matching changes found in the file.</td></tr>`;
+  host.innerHTML=`<div class="modalcard" style="max-width:760px"><div class="modalhead">
+      <div><b>Import balances — preview</b><div class="hint">${IMPORT.rows.length} of ${IMPORT.total} row${IMPORT.total===1?'':'s'} will update${IMPORT.unmatched.length?` · ${IMPORT.unmatched.length} unmatched ID${IMPORT.unmatched.length===1?'':'s'}`:''}</div></div>
+      <button class="btn ghost sm" onclick="closeImport()"><i class="ti ti-x"></i></button></div>
+    <div class="modalbody">
+      ${IMPORT.unmatched.length?`<div class="notewarn"><i class="ti ti-alert-triangle"></i> No employee found for ID: ${IMPORT.unmatched.slice(0,12).map(esc).join(', ')}${IMPORT.unmatched.length>12?`, +${IMPORT.unmatched.length-12} more`:''}. Those rows are skipped.</div>`:''}
+      <div style="overflow:auto;max-height:52vh;margin-top:12px"><table class="roster" style="min-width:520px"><thead><tr><th>Employee</th><th>Changes (current → new)</th></tr></thead><tbody>${body}</tbody></table></div>
+    </div>
+    <div class="modalfoot"><button class="btn ghost" onclick="closeImport()">Cancel</button>
+      <button class="btn primary" onclick="applyImport()" ${IMPORT.rows.length?'':'disabled'}><i class="ti ti-check"></i> Apply ${IMPORT.rows.length} change${IMPORT.rows.length===1?'':'s'}</button></div></div>`;
+  host.classList.add('show');
+}
+function setField(id, field, val){ if(field==='mgr' && val==='') val=null; emp(id)[field]=val; Store.updateEmployee(id,{[field]:val}); toast('Saved'); if(field==='mgr'){rebuildManages();} if(['hireDate','leadership','ptoEligible','rehire','priorSepDate','rehireDate'].includes(field)){ pushBalance(emp(id)); } render(); }
 function rebuildManages(){
   DB.employees.filter(m=>m.role==='manager').forEach(m=>{
     m.manages = DB.employees.filter(e=>e.mgr===m.id).map(e=>e.id);

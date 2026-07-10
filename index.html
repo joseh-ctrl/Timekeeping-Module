@@ -645,8 +645,19 @@ tr:last-child td{border-bottom:none}
 .subtab.on{color:var(--navy);border-bottom-color:var(--tab-acc,var(--accent))}
 .subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--warn);color:#fff;font-size:11px;font-weight:800}
 .execpill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#7c3aed;background:#ede9fe;padding:2px 7px;border-radius:6px;vertical-align:middle;margin-left:4px}
+.ownerpill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#a16207;background:#fef3c7;padding:2px 7px;border-radius:6px;vertical-align:middle;margin-left:4px}
+.teamlist{margin:6px 0 2px}
+.teamrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:13px}
+.teamrow:last-child{border-bottom:none}
+.tr-nm{font-weight:500}
+.tr-x{border:none;background:transparent;color:var(--muted);cursor:pointer;padding:3px 5px;border-radius:6px;display:inline-flex;align-items:center}
+.tr-x:hover{background:var(--badbg,#fee2e2);color:var(--bad)}
+.mgr-flags{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.mgr-flag{flex:1;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer}
+.mgr-flag i{margin-right:3px}
 .tchip-mgr{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#1d4ed8;background:#dbe7fc;padding:1px 5px;border-radius:5px;margin-left:4px}
 .balcell{width:74px;text-align:right}
+.ten-search{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe;font-size:13px}
 .viewas-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fef3c7;border:1px solid #fcd34d;color:#92600a;border-radius:11px;padding:11px 16px;margin-bottom:16px;font-size:13.5px;font-weight:600}
 .scopetgl{display:inline-flex;background:#eef1f7;padding:3px;border-radius:9px;gap:3px;margin-right:8px}
 .scopetgl button{padding:6px 12px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--muted);background:none;white-space:nowrap}
@@ -766,7 +777,7 @@ const Store = (() => {
       return { employees,punches,segApprovals,segNotes:segNotesO,requests:reqs,ptoRequests:ptoReqs,leave,schedules:sched,
                recurring:rec,occurrences:occ,excused,holidays:hol,premiums:prem,ackAlerts,payrollBatches,reportConfigs:rc,punchLocations };
     },
-    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name',ptoUsed:'pto_used',sickUsed:'sick_used',viewAll:'view_all'};
+    updateEmployee(id, patch){ if(!enabled) return null; const m={loc:'state',webPunch:'web_punch',remote:'remote',mgr:'manager_id',rate:'rate',tz:'tz',dept:'dept',role:'role',hireDate:'hire_date',leadership:'leadership',ptoEligible:'pto_eligible',rehire:'rehire',priorSepDate:'prior_sep_date',rehireDate:'rehire_date',empId:'emp_id',email:'email',name:'name',ptoUsed:'pto_used',sickUsed:'sick_used',viewAll:'view_all',owner:'owner'};
       const row={}; Object.keys(patch).forEach(k=>row[m[k]||k]=patch[k]); return sb.from('employees').update(row).eq('id',id); },
     // publish the tenure-computed PTO/sick accrued into the columns the web-clock kiosk reads (used hours stay owned by HR Hub)
     publishBalances(id, ptoAllot, sickAllot){ return enabled ? sb.from('employees').update({pto_allot:ptoAllot, sick_allot:sickAllot}).eq('id',id) : null; },
@@ -3360,6 +3371,12 @@ function pushBalance(e){                                   // recompute + publis
   chk(Store.publishBalances(e.id, b.ptoAllot, b.sickAllot),'Balances'); return true;
 }
 // set an available balance directly: back-calculate used from the tenure bank (avail = bank − used)
+function filterTenure(q){
+  q=(q||'').trim().toLowerCase(); let shown=0;
+  document.querySelectorAll('#tenureBody tr').forEach(tr=>{ const s=tr.getAttribute('data-s')||''; const vis=!q||s.includes(q);
+    tr.style.display=vis?'':'none'; if(vis) shown++; });
+  const em=document.getElementById('tenureEmpty'); if(em) em.style.display=shown?'none':'';
+}
 function setBalance(id, kind, val){
   const e=emp(id); const b=computeBalance(e);
   if(!b){ toast('Set a hire date first'); render(); return; }
@@ -4591,7 +4608,7 @@ function hrRow(e){
     <td><select onchange="setField('${e.id}','tz',this.value)">
         ${Object.entries(TZ).map(([k,v])=>`<option value="${k}" ${e.tz===k?'selected':''}>${v}</option>`).join('')}
       </select></td>
-    <td><span class="pill neutral" title="HR sees and approves every timecard"><i class="ti ti-shield-check"></i> Full access</span></td>
+    <td><span class="pill neutral" title="HR sees and approves every timecard"><i class="ti ti-shield-check"></i> Full access</span> <button class="btn ghost sm" title="Remove admin access" onclick="demoteFromHr('${e.id}')"><i class="ti ti-user-minus"></i></button></td>
     <td class="num"><input type="number" step="0.25" min="0" value="${(e.rate||0).toFixed(2)}" style="width:78px;text-align:right;padding:6px 8px;border:1px solid var(--line);border-radius:7px" onchange="setField('${e.id}','rate',+this.value)"></td>
     <td><button class="toggle ${e.webPunch?'on':''}" onclick="setField('${e.id}','webPunch',${e.webPunch?'false':'true'})" title="${e.webPunch?'Can clock in/out from the web clock':'Biometric clock only'}"><span></span></button></td>
     <td><button class="toggle ${e.remote!==false?'on':''}" onclick="setField('${e.id}','remote',${e.remote!==false?'false':'true'})" title="${e.remote!==false?'Remote — stays signed in on their own device':'On-site terminal — auto-signs-out after each punch'}"><span></span></button></td>
@@ -4636,7 +4653,7 @@ function viewEmployee(){
   const validMgrIds = new Set(managers.map(m=>m.id));               // managers + HR = valid supervisors
   const people = DB.employees.filter(e=>e.role==='employee' || e.role==='manager');   // everyone placeable in the org
   const isExec = e => e.role==='manager' && e.viewAll;              // CEO/COO — top of the org, no supervisor needed
-  const unassigned = people.filter(e=>!isExec(e) && (!e.mgr || !validMgrIds.has(e.mgr)));
+  const unassigned = people.filter(e=>!isExec(e) && !e.owner && (!e.mgr || !validMgrIds.has(e.mgr)));
   const mgrName = id => (emp(id)||{}).name || '';
 
   const mgrCardsHtml = mgrCards.map(m=>{
@@ -4648,12 +4665,12 @@ function viewEmployee(){
     return `<div class="mgrcard">
       <div class="mgrcard-top">
         <div class="mgr-av">${initials(m.name)||'<i class="ti ti-user"></i>'}</div>
-        <div class="mgr-id"><div class="nm">${esc(m.name)}${isExec(m)?' <span class="execpill">Exec</span>':''}</div><div class="sb">${m.loc||''}${m.tz?' · '+TZ[m.tz]:''}${m.mgr&&validMgrIds.has(m.mgr)?' · under '+esc(mgrName(m.mgr)):''}</div></div>
+        <div class="mgr-id"><div class="nm">${esc(m.name)}${m.owner?' <span class="ownerpill">Owner</span>':(isExec(m)?' <span class="execpill">Exec</span>':'')}</div><div class="sb">${m.loc||''}${m.tz?' · '+TZ[m.tz]:''}${m.mgr&&validMgrIds.has(m.mgr)?' · under '+esc(mgrName(m.mgr)):''}</div></div>
         <div class="mgr-count">${team.length} ${team.length===1?'report':'reports'}</div>
         <button class="btn ghost sm" title="Move ${esc(m.name)} back to employee" onclick="demoteToEmployee('${m.id}')"><i class="ti ti-user-down"></i></button>
       </div>
-      ${team.length?`<div class="teamchips">${team.map(e=>`
-        <span class="tchip">${esc(e.name)}${e.role==='manager'?' <span class="tchip-mgr">mgr</span>':''}<button class="x" title="Remove from ${esc(m.name)}'s team" onclick="removeReport('${e.id}')"><i class="ti ti-x"></i></button></span>`).join('')}</div>`
+      ${team.length?`<div class="teamlist">${team.map(e=>`
+        <div class="teamrow"><span class="tr-nm">${esc(e.name)}${e.role==='manager'?' <span class="tchip-mgr">mgr</span>':''}</span><button class="tr-x" title="Remove from ${esc(m.name)}'s team" onclick="removeReport('${e.id}')"><i class="ti ti-x"></i></button></div>`).join('')}</div>`
         :`<div class="teamempty">No one assigned yet.</div>`}
       <div class="assignsel">
         <select onchange="if(this.value){assignReport('${m.id}',this.value)}">
@@ -4661,10 +4678,16 @@ function viewEmployee(){
           ${options}
         </select>
       </div>
-      <label class="mgr-exec" title="Exec — can view and approve every employee, not just their own team">
-        <span><i class="ti ti-eye"></i> View all (exec)</span>
-        <button class="toggle ${isExec(m)?'on':''}" onclick="setField('${m.id}','viewAll',${isExec(m)?'false':'true'})"><span></span></button>
-      </label>
+      <div class="mgr-flags">
+        <label class="mgr-flag" title="Owner — top of the org, no supervisor needed (won't be flagged as unassigned)">
+          <span><i class="ti ti-crown"></i> Owner</span>
+          <button class="toggle ${m.owner?'on':''}" onclick="setField('${m.id}','owner',${m.owner?'false':'true'})"><span></span></button>
+        </label>
+        <label class="mgr-flag" title="Exec — can view and approve every employee, not just their own team">
+          <span><i class="ti ti-eye"></i> View all</span>
+          <button class="toggle ${isExec(m)?'on':''}" onclick="setField('${m.id}','viewAll',${isExec(m)?'false':'true'})"><span></span></button>
+        </label>
+      </div>
     </div>`;
   }).join('');
 
@@ -4678,6 +4701,7 @@ function viewEmployee(){
         <span class="hint" style="margin:0">${e.dept?esc(e.dept)+' · ':''}${e.loc||''}</span>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           ${e.role==='employee'?`<button class="btn sm" title="Promote ${esc(e.name)} to manager" onclick="promoteToManager('${e.id}')"><i class="ti ti-user-up"></i> Make manager</button>`:''}
+          <button class="btn sm" title="Mark ${esc(e.name)} as an owner — top of the org, won't be flagged" onclick="setField('${e.id}','owner',true)"><i class="ti ti-crown"></i> Owner</button>
           <select onchange="if(this.value){assignReport(this.value,'${e.id}')}">
             <option value="">Assign under…</option>
             ${sup.map(m=>`<option value="${m.id}">${esc(m.name)}${isExec(m)?' (exec)':''}</option>`).join('')}
@@ -4702,7 +4726,13 @@ function viewEmployee(){
 
   const hrCard = `<div class="card">
     <h2><i class="ti ti-shield-check"></i> HR &amp; Administrators <span class="cbadge" style="background:var(--muted)">${hrUsers.length}</span></h2>
-    <p class="hint" style="margin-bottom:12px">Full access — these users view and approve every timecard, so they're kept out of the roster count and off any manager's team. Edit their details here.</p>
+    <p class="hint" style="margin-bottom:12px">Full access — these users view and approve every timecard and see payroll, so they're kept out of the roster count and off any manager's team. <b>Adding someone here gives them the HR role.</b> To actually sign in, they also need a login account; if a person's punches or profile aren't showing after you add them, they still need to be set up to log in (see note below).</p>
+    <div class="rosttools" style="margin-bottom:12px">
+      <select onchange="if(this.value)promoteToHr(this.value)">
+        <option value="">+ Add an administrator…</option>
+        ${DB.employees.filter(e=>e.role!=='hr').sort((a,b)=>a.name.localeCompare(b.name)).map(e=>`<option value="${e.id}">${esc(e.name)}${e.role==='manager'?' · mgr':''}${e.dept?' · '+esc(e.dept):''}</option>`).join('')}
+      </select>
+    </div>
     <div style="overflow-x:auto"><table class="roster" style="min-width:840px">${ROSTER_HEAD}<tbody>
       ${hrUsers.map(e=>hrRow(e)).join('') || '<tr><td colspan="9" class="teamempty" style="padding:12px 4px">No HR users set up yet.</td></tr>'}
     </tbody></table></div>
@@ -4734,7 +4764,7 @@ function tenureSection(){
   const rows=DB.employees.slice().sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name));
   const roleTag=e=>e.role==='hr'?'<span class="hint"> · HR</span>':e.role==='manager'?'<span class="hint"> · Mgr</span>':'';
   const body=rows.map(e=>{ const b=computeBalance(e);
-    return `<tr>
+    return `<tr data-s="${esc((e.name+' '+(e.dept||'')+' '+(e.empId||'')).toLowerCase())}">
       <td><div class="who">${esc(e.name)}${roleTag(e)}</div><div class="hint" style="margin:0">ID ${esc(e.empId||'')}</div></td>
       <td>${e.dept?esc(e.dept):'<span class="hint">—</span>'}</td>
       <td><input class="cell-in" type="date" style="width:150px" value="${e.hireDate||''}" onchange="setField('${e.id}','hireDate',this.value)"></td>
@@ -4753,9 +4783,12 @@ function tenureSection(){
       <button class="btn sm" onclick="syncBalancesToKiosk()"><i class="ti ti-refresh"></i> Sync all to kiosk</button>
       <input type="file" id="balImport" accept=".csv,text/csv" style="display:none" onchange="onBalFile(event)">
     </div>
+    <div style="position:relative;margin:0 0 12px;max-width:380px"><i class="ti ti-search" style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)"></i>
+      <input class="ten-search" placeholder="Search name, department, or ID…" oninput="filterTenure(this.value)"></div>
     <div style="overflow-x:auto"><table class="roster" style="min-width:720px">
       <thead><tr><th>Employee</th><th>Dept</th><th>Hire date</th><th style="text-align:center">Leadership</th><th style="text-align:center">PTO-elig</th><th class="num">PTO avail</th><th class="num">Sick avail</th></tr></thead>
-      <tbody>${body}</tbody></table></div>
+      <tbody id="tenureBody">${body}</tbody></table>
+      <div id="tenureEmpty" class="teamempty" style="display:none;padding:14px 4px">No employees match your search.</div></div>
     <div class="hint" style="margin-top:10px"><b>Download current</b> gives you every person pre-filled with today's values — edit the cells that change and re-upload. Matching is by <b>emp_id</b> (the <b>name</b> column is just for your reference). Columns you leave out or blank are left unchanged. You'll always see a preview before anything saves.</div>
   </div>`;
 }
@@ -4867,6 +4900,24 @@ function demoteToEmployee(id){
   e.role='employee';
   chk(Store.updateEmployee(id,{role:'employee'}),'Role');
   rebuildManages(); toast(`${e.name} moved back to employee`); render();
+}
+// Add an administrator: give an existing person the HR role (full access). Elevated — confirm first.
+function promoteToHr(id){
+  const e=emp(id); if(!e || e.role==='hr'){ render(); return; }
+  if(!confirm(`Make ${e.name} an HR administrator?\n\nThey'll be able to view and approve every employee's timecard and see payroll. This can be undone here.`)){ render(); return; }
+  e.role='hr'; e.mgr=null; e.viewAll=false; e.owner=false;
+  chk(Store.updateEmployee(id,{role:'hr',mgr:null,viewAll:false,owner:false}),'Role');
+  rebuildManages(); toast(`${e.name} is now an administrator`); render();
+}
+// Remove an administrator (back to employee). Can't remove yourself or the last admin.
+function demoteFromHr(id){
+  const e=emp(id); if(!e) return;
+  if(id===HOME_ID){ toast("You can't remove your own admin access"); return; }
+  if(DB.employees.filter(x=>x.role==='hr').length<=1){ toast('There must be at least one administrator'); return; }
+  if(!confirm(`Remove ${e.name}'s administrator access? They'll become a regular employee.`)) return;
+  e.role='employee';
+  chk(Store.updateEmployee(id,{role:'employee'}),'Role');
+  rebuildManages(); toast(`${e.name}'s admin access removed`); render();
 }
 
 /* ---------- toast ---------- */

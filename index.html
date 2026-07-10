@@ -75,7 +75,7 @@ input,select{font-family:inherit;font-size:14px}
 .whoami select{width:100%;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:#fff}
 .whoami select option{color:#111}
 
-.main{margin-left:0;flex:1;padding:22px 26px;max-width:100%}
+.main{margin-left:0;flex:1;min-width:0;overflow-x:hidden;padding:22px 26px;max-width:100%}
 .pagehead{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:12px}
 .pagehead h1{font-size:22px;font-weight:700}
 .pagehead p{color:var(--muted);font-size:13px;margin-top:3px}
@@ -647,6 +647,30 @@ tr:last-child td{border-bottom:none}
 
 /* Sub-tabs (Overrides / Recurring) */
 .subtabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+/* ---- Small-screen (phone) refinements ---- */
+@media(max-width:640px){
+  .main{padding:16px 13px 40px}
+  .pagehead{margin-bottom:16px}
+  .pagehead h1{font-size:19px}
+  .pagehead p{font-size:12.5px}
+  .subtabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .subtabs::-webkit-scrollbar{display:none}
+  .subtab{white-space:nowrap;flex-shrink:0}
+  .modal{padding:8px;align-items:flex-end}
+  .modalcard{max-width:100%;max-height:94vh;border-radius:16px 16px 0 0}
+  .topbar{flex-wrap:wrap;gap:8px}
+  .card{padding:16px 15px}
+  .mgrgrid{grid-template-columns:1fr}
+  .rosttools{gap:6px}
+  .rosttools .btn.sm{font-size:12px}
+  .kpis{grid-template-columns:1fr 1fr}
+  .tscroll table{min-width:640px}                 /* keep table columns readable; scroll horizontally */
+  .hours-layout{gap:12px}
+  .emplist{max-height:40vh;overflow-y:auto;-webkit-overflow-scrolling:touch}   /* employee list scrolls instead of pushing the timecard down */
+  .pagehead .btn{font-size:12.5px}
+  .segrowedit{grid-template-columns:1fr;gap:8px}
+}
 .subtab{background:none;padding:9px 16px;font-size:13.5px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
 .subtab.on{color:var(--navy);border-bottom-color:var(--tab-acc,var(--accent))}
 .subtab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--warn);color:#fff;font-size:11px;font-weight:800}
@@ -1642,6 +1666,16 @@ function render(){
   else if(TODETAIL) renderReqDetailModal();
   else if(IMPORT) renderImportModal();
   else { host.innerHTML=''; host.classList.remove('show'); }
+  wrapTables();
+}
+// wrap any table in a horizontal-scroll container so wide tables don't overflow/clip on phones
+function wrapTables(){
+  document.querySelectorAll('#main table').forEach(tb=>{
+    const p=tb.parentElement; if(!p) return;
+    if(p.classList.contains('tscroll')) return;
+    const w=document.createElement('div'); w.className='tscroll';
+    p.insertBefore(w, tb); w.appendChild(tb);
+  });
 }
 
 /* ---------- DASHBOARD ---------- */

@@ -4313,7 +4313,7 @@ function viewReports(){
     <div style="overflow-x:auto;margin-top:14px">${cols.length?table:'<div class="empty">Pick at least one column.</div>'}</div>
   </div>
 
-  ${viewApprovalCard()}
+  ${me().role==='hr'?`${viewApprovalCard()}
 
   <div class="card">
     <h2><i class="ti ti-file-download"></i> Employee timecard export</h2>
@@ -4326,7 +4326,7 @@ function viewReports(){
       </div>
     </div>
     <div class="hint">Uses the period selected above. Includes daily punches, hours, and flags.</div>
-  </div>`;
+  </div>`:''}`;
 }
 
 /* ---------- CONFIGURATION: pay period, thresholds, holidays ---------- */

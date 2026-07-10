@@ -763,7 +763,7 @@ const Store = (() => {
   const inEmp = r => ({ id:r.id, name:r.name, empId:r.emp_id, loc:r.state, dept:r.dept, tz:r.tz, mgr:r.manager_id,
     role:r.role, rate:+r.rate||0, webPunch:r.web_punch, remote:r.remote, email:r.email,
     hireDate:r.hire_date||null, leadership:!!r.leadership, ptoEligible:r.pto_eligible!==false,
-    rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null, viewAll:!!r.view_all,
+    rehire:!!r.rehire, priorSepDate:r.prior_sep_date||null, rehireDate:r.rehire_date||null, viewAll:!!r.view_all, owner:!!r.owner,
     pto:{allot:+r.pto_allot||0,used:+r.pto_used||0}, sick:{allot:+r.sick_allot||0,used:+r.sick_used||0} });
   const inPunch = r => ({ id:r.id, emp:r.employee_id, ts:r.ts, type:r.type, source:r.source, editedBy:r.edited_by, photoUrl:r.photo_url||null });
   const inReq = r => ({ id:r.id, emp:r.employee_id, weekKey:r.week_key, kind:r.kind, targetId:r.target_punch_id,
@@ -4943,7 +4943,7 @@ function renderImportModal(){
 }
 function setField(id, field, val){ if(field==='mgr' && val==='') val=null; emp(id)[field]=val; Store.updateEmployee(id,{[field]:val}); toast('Saved'); if(field==='mgr'){rebuildManages();} if(['hireDate','leadership','ptoEligible','rehire','priorSepDate','rehireDate'].includes(field)){ resetBankToTenure(emp(id)); } render(); }
 function rebuildManages(){
-  DB.employees.filter(m=>m.role==='manager').forEach(m=>{
+  DB.employees.filter(m=>m.role==='manager'||m.role==='hr').forEach(m=>{
     m.manages = DB.employees.filter(e=>e.mgr===m.id).map(e=>e.id);
   });
 }

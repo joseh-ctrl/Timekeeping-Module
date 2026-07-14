@@ -779,7 +779,13 @@ const Store = (() => {
   const inBatch = r => ({ start:r.period_start, stop:r.period_stop, version:r.version, rows:r.rows, status:r.status, by:r.by_name, at:r.at, key:`${r.period_start}|${r.period_stop}` });
   const inRc = r => ({ id:r.id, name:r.name, cols:r.cols, group:r.grp, filterDept:r.filter_dept });
   const inLoc = r => ({ id:r.id, name:r.name, state:r.state||'', lat:r.lat, lng:r.lng, radius:r.radius_m||200, active:r.active!==false });
-  const g = (t,map) => sb.from(t).select('*').then(r => (r.data||[]).map(map));
+  const g = (t,map) => sb.from(t).select('*').then(r => {
+  if (r.error) {
+    console.warn('[load] ' + t + ' failed:', r.error.code, r.error.message);
+    throw Object.assign(new Error('load_failed:' + t), { table: t, code: r.error.code });
+  }
+  return (r.data||[]).map(map);
+});
   return {
     enabled, client:()=>sb,
     async emailLogin(email, password){ if(!enabled) return {ok:false,error:'offline'};

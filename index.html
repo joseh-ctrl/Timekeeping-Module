@@ -802,7 +802,7 @@ const Store = (() => {
         g('employees',inEmp), g('punches',inPunch), sb.from('seg_approvals').select('*'), sb.from('seg_notes').select('*'),
         g('punch_requests',inReq), g('pto_requests',inPto), g('leave_entries',inLeave), g('schedules',inSched),
         g('recurring_schedules',inRec), g('occurrences',inOcc), sb.from('excused_exceptions').select('*'),
-        g('holidays',inHol), g('premiums',inPrem), sb.from('ack_alerts').select('*'),
+        g('holidayz',inHol), g('premiums',inPrem), sb.from('ack_alerts').select('*'),
         g('payroll_batches',inBatch), g('report_configs',inRc) ]);
       const locResp = await sb.from('punch_locations').select('*');
       const punchLocations = (locResp.error ? [] : (locResp.data||[]).map(inLoc));

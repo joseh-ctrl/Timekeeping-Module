@@ -901,7 +901,7 @@ const Live = (() => {
     if(!pending || running) return;
     if(fieldFocused()){ schedule(600); return; }   // someone's typing — wait
     pending=false; running=true;
-    try{ await sync(); }catch(e){ console.error('live sync failed', e); }
+    try{ await sync(); }catch(e){ console.error('live sync failed', e); if(e && e.table) showLoadError(e); }
     finally{ running=false; if(pending) schedule(200); }
   }
   function schedule(ms){ pending=true; clearTimeout(timer); timer=setTimeout(run, ms||350); }
@@ -5065,10 +5065,30 @@ async function doLogin(){
   if(!res.ok){ err.textContent = res.error==='offline' ? 'Offline' : (res.error||'Sign-in failed'); return; }
   await afterAuth();
 }
-async function afterAuth(){
+function showLoadError(e){
+  console.error('Timekeeping data load failed', e);
+  let el = document.getElementById('load-error');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'load-error';
+    el.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.94);color:#fff;font:16px/1.5 system-ui;padding:24px;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<div style="max-width:420px">'
+    + '<div style="font-size:40px;margin-bottom:12px">&#9888;</div>'
+    + '<div style="font-size:20px;font-weight:700;margin-bottom:8px">Couldn\'t load timekeeping data</div>'
+    + '<div style="opacity:.85;margin-bottom:6px">Table: <b>' + (e.table||'unknown') + '</b>' + (e.code ? ' &middot; error ' + e.code : '') + '</div>'
+    + '<div style="opacity:.75;margin-bottom:18px">Hours and approvals are hidden because the data is incomplete. Reload — if it persists, it\'s a GRANT/RLS permissions problem.</div>'
+    + '<button onclick="location.reload()" style="padding:10px 18px;border:0;border-radius:8px;background:#3b82f6;color:#fff;font-weight:600">Reload</button>'
+    + '</div>';
+} 
+  
+  async function afterAuth(){
   const eid=await Store.myEmployeeId();
   if(!eid){ const err=document.getElementById('li-err'); if(err) err.textContent='No employee profile linked to this login — contact HR.'; await Store.signOut(); return; }
-  const snap=await Store.loadAll();
+  let snap;
+  try { snap = await Store.loadAll(); }
+  catch(e){ showLoadError(e); return; }
   if(snap){ Object.keys(snap).forEach(k=>{ DB[k]=snap[k]; }); }
   CURRENT=eid; HOME_ID=eid; AUTHED=true;
   TEAMSCOPE = (me() && me().role==='hr') ? 'all' : 'team';
